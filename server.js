@@ -94,7 +94,26 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
+app.get('/api/debug/sleep-sources', async (req, res) => {
+  const accessToken = req.headers.authorization?.split(' ')[1];
+  if (!accessToken) return res.status(401).json({ error: 'Access token is required.' });
 
+  try {
+    oauth2Client.setCredentials({ access_token: accessToken });
+    const fitnessClient = fitness({ version: 'v1', auth: oauth2Client });
+
+    const dataSourcesRes = await fitnessClient.users.dataSources.list({ userId: 'me' });
+    
+    // データタイプが睡眠セグメントのものだけをフィルタリング
+    const sleepDataSources = dataSourcesRes.data.dataSource
+      ?.filter(ds => ds.dataType?.name === 'com.google.sleep.segment');
+
+    res.json(sleepDataSources);
+  } catch (error) {
+    console.error('Failed to list sleep sources:', error.message);
+    res.status(500).json({ error: 'Failed to list sleep sources.' });
+  }
+});
 //=================================
 // ヘルパー関数
 //=================================

@@ -1,7 +1,6 @@
 // src/hooks/useSleepData.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
-// 型定義
 export interface SleepSegment {
   stage: string;
   startTime: Date;
@@ -9,21 +8,16 @@ export interface SleepSegment {
   durationMinutes: number;
 }
 
-// 睡眠段階のマッピング
 const sleepStageMap: { [key: number]: string } = {
-  1: '覚醒',
-  2: '睡眠(不明)',
-  3: '離床',
-  4: '浅い睡眠',
-  5: '深い睡眠',
-  6: 'レム睡眠',
+  1: '覚醒', 2: '睡眠(不明)', 3: '離床',
+  4: '浅い睡眠', 5: '深い睡眠', 6: 'レム睡眠',
 };
 
 interface SleepDataState {
   sleepSegments: SleepSegment[];
   isLoading: boolean;
   error: Error | null;
-  fetchData: () => void;
+  fetchSleepData: (startDate: Date, endDate: Date) => Promise<void>;
 }
 
 export const useSleepData = (accessToken: string | null): SleepDataState => {
@@ -31,21 +25,13 @@ export const useSleepData = (accessToken: string | null): SleepDataState => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchData = useCallback(async () => {
-    if (!accessToken) {
-      setSleepSegments([]);
-      return;
-    }
+  const fetchSleepData = useCallback(async (startDate: Date, endDate: Date) => {
+    if (!accessToken) return;
 
     setIsLoading(true);
     setError(null);
     try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - 7); // 過去7日間を対象
-
-      // 1. 睡眠セッションの取得
-      const sessionsResponse = await fetch(`https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${startDate.toISOString()}&endTime=${endDate.toISOString()}&activityType=72`, {
+      const sessionsResponse = await fetch(`https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${startDate.toISOString()}&endTime=${endDate.toISOString()}&activityType=72&includeDeleted=true`, {
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
       if (!sessionsResponse.ok) throw new Error(`睡眠セッションの取得に失敗: ${sessionsResponse.statusText}`);
@@ -57,7 +43,6 @@ export const useSleepData = (accessToken: string | null): SleepDataState => {
         return;
       }
 
-      // 2. 各セッションのセグメントを取得
       const allSegments: SleepSegment[] = [];
       for (const session of sessionsData.session) {
         const segmentsResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
@@ -93,5 +78,5 @@ export const useSleepData = (accessToken: string | null): SleepDataState => {
     }
   }, [accessToken]);
 
-  return { sleepSegments, isLoading, error, fetchData };
+  return { sleepSegments, isLoading, error, fetchSleepData };
 };

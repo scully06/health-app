@@ -1,6 +1,6 @@
 // src/ui/WeightDataDisplay.tsx
-import React, { useEffect } from 'react';
-import { useWeightData, type WeightDataPoint } from '../hooks/useWeightData';
+import React, { useState } from 'react';
+import { useWeightData } from '../hooks/useWeightData';
 import type { RecordManager } from '../core/services/RecordManager';
 import { WeightRecord } from '../core/models/WeightRecord';
 import { buttonStyle } from './styles';
@@ -8,20 +8,23 @@ import { buttonStyle } from './styles';
 interface WeightDataDisplayProps {
   accessToken: string | null;
   recordManager: RecordManager;
-  onSync: () => void; // 同期完了を親に通知するコールバック
+  onSync: () => void;
 }
 
 export const WeightDataDisplay: React.FC<WeightDataDisplayProps> = ({ accessToken, recordManager, onSync }) => {
-  const { weightData, isLoading, error, fetchData } = useWeightData(accessToken);
+  const { weightData, isLoading, error, fetchWeightData } = useWeightData(accessToken);
+  
+  const today = new Date();
+  const thirtyDaysAgo = new Date(new Date().setDate(today.getDate() - 30));
 
-  // コンポーネントが表示された時、またはaccessTokenが変わった時にデータを取得
-  useEffect(() => {
-    if (accessToken) {
-      fetchData();
-    }
-  }, [accessToken, fetchData]);
+  const [startDate, setStartDate] = useState(thirtyDaysAgo.toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(today.toISOString().split('T')[0]);
 
-  const handleSyncClick = async () => {
+  const handleFetchClick = () => {
+    fetchWeightData(new Date(startDate), new Date(endDate + "T23:59:59"));
+  };
+  
+  const handleSyncAllClick = async () => {
     if (weightData.length === 0) {
       alert('同期できる体重データがありません。');
       return;
@@ -31,27 +34,32 @@ export const WeightDataDisplay: React.FC<WeightDataDisplayProps> = ({ accessToke
       await recordManager.saveRecord(record);
     }
     alert(`${weightData.length}件の体重データをローカルに同期しました。`);
-    onSync(); // 親コンポーネントにUI更新を依頼
+    onSync();
   };
 
   return (
     <div style={{ marginTop: '24px' }}>
       <h4>体重データ (Google Fit)</h4>
-      {isLoading && <p>読み込み中...</p>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+        <span>〜</span>
+        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        <button onClick={handleFetchClick} disabled={isLoading} style={{ ...buttonStyle, width: 'auto', marginTop: 0, padding: '8px 12px' }}>
+          {isLoading ? '取得中...' : 'この期間のデータを取得'}
+        </button>
+      </div>
+      
       {error && <p style={{ color: 'red' }}>エラー: {error.message}</p>}
       
       {!isLoading && !error && (
         <>
           {weightData.length === 0 ? (
-            <p>過去1ヶ月の体重データはありません。</p>
+            <p>指定期間の体重データはありません。</p>
           ) : (
             <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #eee', padding: '8px', borderRadius: '8px' }}>
               <table>
                 <thead>
-                  <tr>
-                    <th>日付</th>
-                    <th>平均体重 (kg)</th>
-                  </tr>
+                  <tr><th>日付</th><th>平均体重 (kg)</th></tr>
                 </thead>
                 <tbody>
                   {weightData.map((point) => (
@@ -64,8 +72,8 @@ export const WeightDataDisplay: React.FC<WeightDataDisplayProps> = ({ accessToke
               </table>
             </div>
           )}
-          <button onClick={handleSyncClick} disabled={weightData.length === 0} style={{ ...buttonStyle, width: 'auto', marginTop: '16px' }}>
-            このデータをローカルに同期
+          <button onClick={handleSyncAllClick} disabled={weightData.length === 0} style={{ ...buttonStyle, width: 'auto', marginTop: '16px' }}>
+            表示中の全データを同期
           </button>
         </>
       )}

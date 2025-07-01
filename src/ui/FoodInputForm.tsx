@@ -1,5 +1,5 @@
 // src/ui/FoodInputForm.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { User } from '../core/models/User';
 import { FoodRecord, MealType, type MealTypeValue } from '../core/models/FoodRecord';
 import type { RecordManager } from '../core/services/RecordManager';
@@ -30,7 +30,7 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
       setIsDbLoading(false);
       console.log('[FoodInputForm] データベースの準備が完了しました。');
     });
-  }, []); // 空の依存配列で、初回レンダリング時に一度だけ実行
+  }, []);
 
   // 検索キーワードが変更された時に検索を実行する
   useEffect(() => {
@@ -42,7 +42,7 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     setSearchResults(results);
   }, [searchTerm, isDbLoading]);
 
-
+  // 検索結果から食品を選択した時の処理
   const handleSelectProduct = (food: FoodDataItem) => {
     setDescription(food.name);
     setCaloriesPer100g(food.calories);
@@ -61,24 +61,36 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     setCalories(Math.round(calculatedCalories).toString());
   }, [grams, caloriesPer100g]);
 
+  // 合計カロリー欄を手動で編集した時の処理
   const handleCaloriesManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCalories(e.target.value);
-    setCaloriesPer100g(null);
+    setCaloriesPer100g(null); // 自動計算をオフにする
   };
 
+  // 保存ボタンクリック時の処理とバリデーション
   const handleSave = async () => {
+    const gramsValue = parseFloat(grams);
     const caloriesValue = parseInt(calories, 10);
-    if (!description || isNaN(caloriesValue) || caloriesValue < 0) {
-      alert('内容と正しいカロリーを入力してください。');
+
+    if (!description.trim()) {
+      alert('内容を入力してください。');
       return;
     }
-    
+    if (isNaN(gramsValue) || gramsValue <= 0) {
+      alert('食べた量には0より大きい数値を入力してください。');
+      return;
+    }
+    if (isNaN(caloriesValue) || caloriesValue < 0) {
+      alert('合計カロリーには0以上の数値を入力してください。');
+      return;
+    }
+
     const newRecord = new FoodRecord(
       `food-${Date.now()}`,
       user.id,
       new Date(currentDate),
       mealType,
-      description,
+      description.trim(),
       caloriesValue
     );
     
@@ -133,11 +145,23 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
       <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
         <div style={{ flex: 1 }}>
           <label>食べた量 (g)</label>
-          <input type="number" value={grams} onChange={e => setGrams(e.target.value)} style={inputStyle} />
+          <input 
+            type="number" 
+            value={grams} 
+            onChange={e => setGrams(e.target.value)} 
+            style={inputStyle} 
+            min="1"
+          />
         </div>
         <div style={{ flex: 1 }}>
           <label>合計カロリー (kcal)</label>
-          <input type="number" value={calories} onChange={handleCaloriesManualChange} style={inputStyle} />
+          <input 
+            type="number" 
+            value={calories} 
+            onChange={handleCaloriesManualChange} 
+            style={caloriesPer100g !== null ? {...inputStyle, backgroundColor: '#f0f0f0'} : inputStyle}
+            min="0"
+          />
         </div>
       </div>
       <button onClick={handleSave} style={buttonStyle}>この食事を記録</button>
