@@ -1,12 +1,10 @@
 // src/ui/FoodInputForm.tsx
-// src/ui/FoodInputForm.tsx
 import React, { useState, useEffect } from 'react';
 import { User } from '../core/models/User';
-import { FoodRecord, MealType} from '../core/models/FoodRecord';
-import type { MealTypeValue } from '../core/models/FoodRecord';
+import { FoodRecord, MealType, type MealTypeValue } from '../core/models/FoodRecord';
 import type { RecordManager } from '../core/services/RecordManager';
 import { cardStyle, inputStyle, buttonStyle } from './styles';
-import { foodDatabaseService, type FoodDataItem } from '../core/services/FoodDatabaseService'; //【修正】
+import { foodDatabaseService, type FoodDataItem } from '../core/services/FoodDatabaseService';
 
 interface FoodInputFormProps {
   user: User;
@@ -24,27 +22,27 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<FoodDataItem[]>([]);
-  const [isDbLoading, setIsDbLoading] = useState(true); //【追加】DB読み込み中フラグ
+  const [isDbLoading, setIsDbLoading] = useState(true);
 
-  //【追加】初回に一度だけデータベースを初期化する
+  // 初回に一度だけデータベースを初期化する
   useEffect(() => {
     foodDatabaseService.initialize().then(() => {
       setIsDbLoading(false);
+      console.log('[FoodInputForm] データベースの準備が完了しました。');
     });
-  }, []);
+  }, []); // 空の依存配列で、初回レンダリング時に一度だけ実行
 
-  //【修正】検索ロジックをサービス呼び出しに変更
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const term = e.target.value;
-    setSearchTerm(term);
-    if (term.length > 1) {
-      const results = foodDatabaseService.search(term);
-      setSearchResults(results);
-    } else {
+  // 検索キーワードが変更された時に検索を実行する
+  useEffect(() => {
+    if (isDbLoading || searchTerm.length < 1) {
       setSearchResults([]);
+      return;
     }
-  };
-  
+    const results = foodDatabaseService.search(searchTerm);
+    setSearchResults(results);
+  }, [searchTerm, isDbLoading]);
+
+
   const handleSelectProduct = (food: FoodDataItem) => {
     setDescription(food.name);
     setCaloriesPer100g(food.calories);
@@ -53,27 +51,21 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     setSearchTerm('');
     setSearchResults([]);
   };
-
-  // グラム数または100gあたりのカロリーが変更されたら、合計カロリーを再計算する
+  
+  // 合計カロリーの自動計算
   useEffect(() => {
-    if (caloriesPer100g === null || grams === '') {
-      return;
-    }
+    if (caloriesPer100g === null || grams === '') return;
     const gramsValue = parseFloat(grams);
-    if (isNaN(gramsValue)) {
-      return;
-    }
+    if (isNaN(gramsValue)) return;
     const calculatedCalories = (caloriesPer100g / 100) * gramsValue;
     setCalories(Math.round(calculatedCalories).toString());
   }, [grams, caloriesPer100g]);
 
-  // 合計カロリー欄を手動で編集した時の処理
   const handleCaloriesManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCalories(e.target.value);
-    setCaloriesPer100g(null); // 自動計算をオフにする
+    setCaloriesPer100g(null);
   };
-  
-  // 保存処理
+
   const handleSave = async () => {
     const caloriesValue = parseInt(calories, 10);
     if (!description || isNaN(caloriesValue) || caloriesValue < 0) {
@@ -110,10 +102,10 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
         <input 
           type="text" 
           value={searchTerm} 
-          onChange={handleSearchChange} 
+          onChange={e => setSearchTerm(e.target.value)}
           style={inputStyle} 
           placeholder={isDbLoading ? "データベースを準備中..." : "例: とりむね, ごはん"}
-          disabled={isDbLoading} // 準備中は入力を無効化
+          disabled={isDbLoading}
         />
         {searchResults.length > 0 && (
           <ul style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #ccc', listStyle: 'none', padding: 0, margin: '4px 0 0', zIndex: 10, borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
@@ -145,7 +137,7 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
         </div>
         <div style={{ flex: 1 }}>
           <label>合計カロリー (kcal)</label>
-          <input type="number" value={calories} onChange={handleCaloriesManualChange} style={caloriesPer100g !== null ? {...inputStyle, backgroundColor: '#f0f0f0'} : inputStyle} />
+          <input type="number" value={calories} onChange={handleCaloriesManualChange} style={inputStyle} />
         </div>
       </div>
       <button onClick={handleSave} style={buttonStyle}>この食事を記録</button>
