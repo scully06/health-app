@@ -1,14 +1,19 @@
-// src/main.tsx
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-//【変更】AppWrapperをインポート
-import AppWrapper from './App.tsx'; 
+import App from './App';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import './index.css';
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+if (!googleClientId) {
+  console.error("VITE_GOOGLE_CLIENT_ID が .env ファイルに設定されていません。");
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {/*【変更】AppWrapperをレンダリング */}
-    <AppWrapper />
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <App />
+    </GoogleOAuthProvider>
   </React.StrictMode>,
 );

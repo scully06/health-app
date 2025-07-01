@@ -6,13 +6,14 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  //【追加】開発サーバーが .xlsx ファイルを正しく認識できるようにする
   server: {
-    watch: {
-      usePolling: true,
-    },
-    // これにより、不明なパスへのリクエストがindex.htmlにフォールバックするのを
-    // 特定の状況で制御しやすくなりますが、今回は主にパスの指定方法が重要です。
+    // バックエンドAPIへのプロキシ設定
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      }
+    }
   },
   //【追加】ビルド時に .xlsx ファイルをアセットとして扱う
   build: {
@@ -25,6 +26,6 @@ export default defineConfig({
           return 'assets/[name]-[hash][extname]';
         },
       },
-    },
   },
+},
 })

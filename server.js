@@ -1,31 +1,29 @@
+// server.js (または server.mjs)
+
 import express from 'express';
 import dotenv from 'dotenv';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { OAuth2Client } from 'google-auth-library';
-import { fitness } from '@googleapis/fitness';
-
-// .env ファイルから環境変数を読み込む (必ず最初に実行)
+import { GoogleGenerativeAI } from '@google/generative-ai'; //【追加】
+import cors from 'cors';
+// .env ファイルから環境変数を読み込む
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:5173' 
+}));
 
+app.use(express.json());
 const PORT = 3001;
 
-// --- Gemini APIのための設定 ---
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_API_KEY) {
-  console.error("エラー: GEMINI_API_KEYが.envファイルに設定されていません。");
-}
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
-// --- Google Fit 連携のための設定 ---
+// --- Google OAuth 2.0 クライアントの設定 ---
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-  console.error("エラー: GOOGLE_CLIENT_ID または GOOGLE_CLIENT_SECRET が.envファイルに設定されていません。");
+  console.error("エラー: .envファイルにGOOGLE_CLIENT_IDまたはGOOGLE_CLIENT_SECRETが設定されていません。");
+  process.exit(1);
 }
 
 const oauth2Client = new OAuth2Client(
@@ -34,114 +32,88 @@ const oauth2Client = new OAuth2Client(
   'postmessage'
 );
 
+// ---【追加】Gemini APIのための設定 ---
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  console.error("エラー: .envファイルにGEMINI_API_KEYが設定されていません。");
+  // process.exit(1); // Geminiキーがなくても認証サーバーは動かせるように、一旦コメントアウト
+}
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
 
 //=================================
 // APIルートの定義
 //=================================
 
 /**
- * Gemini APIに分析を依頼するエンドポイント
+ * フロントエンドから受け取った認証コードをアクセストークンに交換するエンドポイント。
  */
-app.post('/api/analyze', async (req, res) => {
-  try {
-    const { records } = req.body;
-    if (!records || records.length === 0) {
-      return res.status(400).json({ error: 'Records are required' });
-    }
-    const prompt = createPromptForGemini(records);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    res.json({ analysisText: text });
-  } catch (error) {
-    console.error('Error calling Gemini API:', error.message);
-    res.status(500).json({ error: 'Geminiとの分析に失敗しました。' });
-  }
-});
-
-/**
- * Google Fitからデータを取得するエンドポイント
- */
-app.post('/api/analyze', async (req, res) => {
-  // ... (この中身は変更なし)
-});
-
-/**
- * Google Fitからデータを取得するエンドポイント
- */
-app.post('/api/google-fit/sync', async (req, res) => {
-  //【重要】この行で `code` をリクエストボディから取り出します
-  const { code } = req.body; 
-
+app.post('/api/auth/google', async (req, res) => {
+  const { code } = req.body;
   if (!code) {
     return res.status(400).json({ error: 'Authorization code is required.' });
   }
-
   try {
     const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
-    const fitnessClient = fitness({ version: 'v1', auth: oauth2Client });
-
-    const endTimeMillis = Date.now();
-    const startTimeMillis = endTimeMillis - 7 * 24 * 60 * 60 * 1000;
-    const datasetId = `${startTimeMillis * 1e6}-${endTimeMillis * 1e6}`;
-
-    // --- 体重データの取得ロジック ---
-    const weightDataSourceId = 'raw:com.google.weight:com.mc.simplehealth:Simple Health - weight';
-    console.log(`[GoogleFit] 特定のデータソースIDで体重データをリクエストします: ${weightDataSourceId}`);
-    
-    const weightRes = await fitnessClient.users.dataSources.datasets.get({
-      userId: 'me',
-      dataSourceId: weightDataSourceId,
-      datasetId: datasetId,
-    });
-    console.log('[GoogleFit] 体重データの生レスポンス:', JSON.stringify(weightRes.data, null, 2));
-    
-    const weights = weightRes.data.point
-      ?.filter(p => p?.value?.[0]?.fpVal && p.startTimeNanos)
-      .map(p => ({
-        date: new Date(Number(p.startTimeNanos) / 1e6).toISOString(),
-        weight: p.value[0].fpVal,
-      })) || [];
-
-    // --- 睡眠データの取得ロジック ---
-    console.log('[GoogleFit] 睡眠データをリクエスト中...');
-    const sleepRes = await fitnessClient.users.sessions.list({
-      userId: 'me',
-      activityType: [72],
-      startTime: new Date(startTimeMillis).toISOString(),
-      endTime: new Date(endTimeMillis).toISOString(),
-    });
-    const sleeps = sleepRes.data.session
-      ?.map(s => ({
-        date: new Date(Number(s.startTimeMillis)).toISOString(),
-        sleepTime: (Number(s.endTimeMillis) - Number(s.startTimeMillis)) / (1000 * 60 * 60),
-      }))
-      .filter(p => p.sleepTime) || [];
-
-    console.log(`[GoogleFit] 取得結果: ${weights.length}件の体重データ, ${sleeps.length}件の睡眠データ`);
-    res.json({ weights, sleeps });
-
+    console.log('[Auth Server] Googleからトークンを正常に取得しました。');
+    res.json(tokens);
   } catch (error) {
-    console.error('Failed to sync with Google Fit:', error.message);
-    if (error.response) {
-      console.error('Google API Error Body:', error.response.data);
-    }
-    res.status(500).json({ error: 'Google Fitとの同期に失敗しました。API設定や権限を確認してください。' });
+    console.error('Failed to exchange auth code for tokens:', error.message);
+    res.status(500).json({ error: 'Failed to authenticate with Google.' });
   }
 });
 
+/**
+ *【追加】Gemini APIに分析を依頼するエンドポイント
+ */
+app.post('/api/analyze', async (req, res) => {
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'Gemini APIキーがサーバーに設定されていません。' });
+  }
+  try {
+    const { records } = req.body;
+    if (!records || records.length === 0) {
+      return res.status(400).json({ error: '分析対象の記録データ(records)が必要です。' });
+    }
+    
+    // プロンプトを生成
+    const prompt = createPromptForGemini(records);
+    
+    // Gemini APIにリクエストを送信
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    console.log('[Gemini Server] AI分析結果を生成しました。');
+    res.json({ analysisText: text });
+
+  } catch (error) {
+    console.error('Error calling Gemini API:', error.message);
+    res.status(500).json({ error: 'Geminiによる分析に失敗しました。' });
+  }
+});
 
 
 //=================================
 // ヘルパー関数
 //=================================
 
+/**
+ *【追加】Gemini APIに渡すプロンプトを生成する関数
+ */
 function createPromptForGemini(records) {
-  const recordsText = records.map(r => 
-    `日付: ${new Date(r.date).toLocaleDateString('ja-JP')}, ` +
-    (r.weight ? `体重: ${r.weight}kg` : `睡眠: ${r.sleepTime}h, 質: ${r.quality}`)
-  ).join('\n');
+  const recordsText = records.map(r => {
+    let detail = '';
+    if (r.weight) {
+      detail = `体重: ${r.weight}kg`;
+    } else if (r.sleepTime) {
+      detail = `睡眠: ${r.sleepTime.toFixed(1)}h, 質: ${r.quality}`;
+    } else if (r.mealType) {
+      detail = `食事(${r.mealType}): ${r.description} (${r.calories}kcal)`;
+    }
+    return `日付: ${new Date(r.date).toLocaleDateString('ja-JP')}, ${detail}`;
+  }).join('\n');
   
   return `
     あなたは優秀な健康アドバイザーです。
@@ -152,7 +124,8 @@ function createPromptForGemini(records) {
 
     【アドバイスの例】
     - 「最近、体重が安定していますね！十分な睡眠がとれているおかげかもしれません。この調子で頑張りましょう！」
-    - 「少し睡眠が足りない日が続いているようです。体重への影響も考えられますので、今夜は少し早めに休んでみてはいかがでしょうか？」
+    - 「週末の食事カロリーが少し多い傾向にあるようです。楽しみつつも、平日の食事でバランスを取ると良いかもしれませんね。」
+    - 「睡眠時間が短い日は、翌日の体重に影響が出ているようです。今夜は少し早めに休んでみてはいかがでしょうか？」
   `;
 }
 
@@ -161,5 +134,5 @@ function createPromptForGemini(records) {
 // サーバー起動
 //=================================
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Authentication and Analysis server is running on http://localhost:${PORT}`);
 });
