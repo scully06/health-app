@@ -11,12 +11,11 @@ interface WeightInputFormProps {
   recordManager: RecordManager;
   analysisEngine: AnalysisEngine;
   onRecordSaved: () => void;
-  currentDate: string; //【追加】
+  currentDate: string;
 }
 
 export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordManager, analysisEngine, onRecordSaved, currentDate }) => {
   const [weight, setWeight] = useState<string>('');
-  //【削除】const [date, setDate] = useState<string>(...);
   const [feedbackMessage, setFeedbackMessage] = useState<string>('');
 
   const handleSaveClick = async () => {
@@ -26,7 +25,9 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
       return;
     }
 
-    const newRecord = new WeightRecord(`weight-${new Date(currentDate).getTime()}`, user.id, new Date(currentDate), weightValue);
+    //【重要】日付に基づいた一意なIDを生成
+    const recordId = `manual-weight-${new Date(currentDate).toISOString().split('T')[0]}`;
+    const newRecord = new WeightRecord(recordId, user.id, new Date(currentDate), weightValue);
 
     try {
       await recordManager.saveRecord(newRecord);
@@ -37,13 +38,13 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
       onRecordSaved();
     } catch (error) {
       setFeedbackMessage('エラー: 保存に失敗しました。');
+      console.error(error);
     }
   };
 
   return (
     <div style={cardStyle}>
       <h3 style={{ marginTop: 0, color: '#2c3e50' }}>体重を記録</h3>
-      {/*【削除】日付入力欄を削除*/}
       <div style={{ marginBottom: '16px' }}>
         <label htmlFor="weight-input">体重 (kg)</label>
         <input id="weight-input" type="number" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="例: 65.5" style={inputStyle} />

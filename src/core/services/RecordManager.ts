@@ -6,12 +6,11 @@ import { HealthRecord } from '../models/HealthRecord';
 import type { IRecordManager } from './interfaces/IRecordManager';
 import { FoodRecord } from '../models/FoodRecord';
 
-//【修正】IRecordManagerインターフェースにもdeleteRecordを追加
 export interface IExtendedRecordManager extends IRecordManager {
   deleteRecord(recordId: string): Promise<void>;
 }
 
-export class RecordManager implements IRecordManager { // IExtendedRecordManager を実装
+export class RecordManager implements IExtendedRecordManager {
   private readonly STORAGE_KEY = 'health-app-records';
   private records: HealthRecord[] = [];
 
@@ -26,17 +25,10 @@ export class RecordManager implements IRecordManager { // IExtendedRecordManager
       if (storedData) {
         const plainObjects: any[] = JSON.parse(storedData);
         this.records = plainObjects.map(obj => {
-          obj.date = new Date(obj.date); 
-          if ('weight' in obj) {
-            return new WeightRecord(obj.id, obj.userId, obj.date, obj.weight);
-          }
-          if ('sleepTime' in obj) {
-            return new SleepRecord(obj.id, obj.userId, obj.date, obj.sleepTime, obj.quality);
-          }
-          //【追加】FoodRecordの読み込みロジック
-          if ('mealType' in obj) {
-            return new FoodRecord(obj.id, obj.userId, obj.date, obj.mealType, obj.description, obj.calories);
-          }
+          const recordDate = new Date(obj.date);
+          if ('weight' in obj) return new WeightRecord(obj.id, obj.userId, recordDate, obj.weight);
+          if ('stageDurations' in obj) return new SleepRecord(obj.id, obj.userId, recordDate, obj.stageDurations);
+          if ('mealType' in obj) return new FoodRecord(obj.id, obj.userId, recordDate, obj.mealType, obj.description, obj.calories);
           return null;
         }).filter(Boolean) as HealthRecord[];
         
@@ -51,34 +43,48 @@ export class RecordManager implements IRecordManager { // IExtendedRecordManager
   private saveRecordsToStorage(): void {
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.records));
-      console.log('[RecordManager] データをlocalStorageに保存しました。');
     } catch (error) {
       console.error('[RecordManager] localStorageへのデータ保存に失敗しました。', error);
     }
   }
-
+  
+  /**
+   *【重要】重複記録防止ロジックを組み込んだsaveRecordメソッド
+   */
   public async saveRecord(record: HealthRecord): Promise<void> {
-    //【修正】食事記録は1日に複数回あるため、IDで重複を判定する
-    let foundIndex = this.records.findIndex(r => r.id === record.id);
-
-    // 手動入力の体重・睡眠記録の場合のみ、日付と種類で重複を探す
-    if (!(record instanceof FoodRecord) && !record.id.startsWith('gf-')) {
-       foundIndex = this.records.findIndex(
-         (r) => 
-           r.userId === record.userId &&
-           r.date.getFullYear() === record.date.getFullYear() &&
-           r.date.getMonth() === record.date.getMonth() &&
-           r.date.getDate() === record.date.getDate() &&
-           r.constructor === record.constructor &&
-           !r.id.startsWith('gf-')
-       );
-    }
+    const foundIndex = this.records.findIndex(r => r.id === record.id);
 
     if (foundIndex !== -1) {
+      // 既存のIDがあれば、それは「編集」なので上書きする
       this.records[foundIndex] = record;
+      console.log(`[RecordManager] 記録を上書きしました (ID: ${record.id})`);
     } else {
-      this.records.push(record);
+      // IDがなければ新規。ただし、手動の体重・睡眠は1日1件の重複チェックを行う
+      if (record instanceof WeightRecord || record instanceof SleepRecord) {
+        // Google Fitからの同期データ('gf-'で始まるID)は、このチェックをスキップ
+        if (!record.id.startsWith('gf-')) {
+          const dailyDuplicateIndex = this.records.findIndex(r =>
+            !r.id.startsWith('gf-') && // 手動入力同士で比較
+            r.constructor === record.constructor && // 同じ種類の記録か(WeightRecord vs WeightRecord)
+            new Date(r.date).toDateString() === new Date(record.date).toDateString() // 同じ日付か
+          );
+
+          if (dailyDuplicateIndex !== -1) {
+            //【重要】重複が見つかった場合はアラートを出し、保存しない
+            alert(`この日付の${record instanceof WeightRecord ? '体重' : '睡眠'}記録は既に存在します。既存の記録を上書きします。`);
+            this.records[dailyDuplicateIndex] = record; // 重複した古い方を上書きする
+          } else {
+            this.records.push(record);
+          }
+        } else {
+           this.records.push(record); // Google Fitのデータは重複チェックせず追加
+        }
+      } else {
+        // 食事記録は重複チェックなしで常に追加
+        this.records.push(record);
+      }
     }
+
     this.saveRecordsToStorage();
   }
 
@@ -89,8 +95,12 @@ export class RecordManager implements IRecordManager { // IExtendedRecordManager
   public async deleteRecord(recordId: string): Promise<void> {
     const initialLength = this.records.length;
     this.records = this.records.filter(r => r.id !== recordId);
+
     if (this.records.length < initialLength) {
       this.saveRecordsToStorage();
+      console.log(`[RecordManager] 記録を削除しました (ID: ${recordId})`);
+    } else {
+      console.warn(`[RecordManager] 削除対象の記録が見つかりませんでした (ID: ${recordId})`);
     }
   }
 }

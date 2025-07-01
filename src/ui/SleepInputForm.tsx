@@ -1,7 +1,7 @@
 // src/ui/SleepInputForm.tsx
 import React, { useState } from 'react';
 import type { User } from '../core/models/User';
-import { SleepRecord } from '../core/models/SleepRecord';
+import { SleepRecord, type SleepStageDurations } from '../core/models/SleepRecord';
 import type { RecordManager } from '../core/services/RecordManager';
 import { cardStyle, inputStyle, buttonStyle } from './styles';
 
@@ -9,44 +9,57 @@ interface SleepInputFormProps {
   user: User;
   recordManager: RecordManager;
   onRecordSaved: () => void;
-  currentDate: string; //【追加】
+  currentDate: string;
 }
 
 export const SleepInputForm: React.FC<SleepInputFormProps> = ({ user, recordManager, onRecordSaved, currentDate }) => {
-  const [sleepTime, setSleepTime] = useState<string>('');
-  //【削除】const [date, setDate] = useState<string>(...);
-  const [quality, setQuality] = useState<typeof SleepRecord.Quality[keyof typeof SleepRecord.Quality]>(SleepRecord.Quality.NORMAL);
+  const [deep, setDeep] = useState('');
+  const [light, setLight] = useState('');
+  const [rem, setRem] = useState('');
+  const [awake, setAwake] = useState('');
+  const [feedback, setFeedback] = useState('');
 
-  const handleSaveClick = async () => {
-    const sleepTimeValue = parseFloat(sleepTime);
-    if (isNaN(sleepTimeValue) || sleepTimeValue <= 0 || sleepTimeValue > 24) {
-      alert('正しい睡眠時間を入力してください。');
+  const handleSave = async () => {
+    const deepMinutes = parseInt(deep, 10) || 0;
+    const lightMinutes = parseInt(light, 10) || 0;
+    const remMinutes = parseInt(rem, 10) || 0;
+    const awakeMinutes = parseInt(awake, 10) || 0;
+
+    if (deepMinutes + lightMinutes + remMinutes + awakeMinutes <= 0) {
+      setFeedback('少なくとも1つの睡眠ステージの時間を入力してください。');
       return;
     }
 
-    const newRecord = new SleepRecord(`sleep-${new Date(currentDate).getTime()}`, user.id, new Date(currentDate), sleepTimeValue, quality);
+    const stageDurations: SleepStageDurations = {
+      deep: deepMinutes, light: lightMinutes, rem: remMinutes, awake: awakeMinutes,
+    };
+
+    //【重要】日付に基づいた一意なIDを生成
+    const recordId = `manual-sleep-${new Date(currentDate).toISOString().split('T')[0]}`;
+    const newRecord = new SleepRecord(recordId, user.id, new Date(currentDate), stageDurations);
     
-    await recordManager.saveRecord(newRecord);
-    setSleepTime('');
-    onRecordSaved();
-    alert('睡眠時間を保存しました！');
+    try {
+      await recordManager.saveRecord(newRecord);
+      setFeedback('睡眠記録を保存しました！');
+      setDeep(''); setLight(''); setRem(''); setAwake('');
+      onRecordSaved();
+    } catch (error) {
+      setFeedback('エラーが発生しました。');
+      console.error(error);
+    }
   };
 
   return (
     <div style={cardStyle}>
-      <h4 style={{ marginTop: 0, color: '#2c3e50' }}>睡眠を記録</h4>
-      {/*【削除】日付入力欄を削除*/}
-      <div style={{ marginBottom: '16px' }}>
-        <label>睡眠時間 (h)</label>
-        <input type="number" step="0.5" value={sleepTime} onChange={(e) => setSleepTime(e.target.value)} placeholder="例: 7.5" style={inputStyle} />
+      <h3 style={{ marginTop: 0 }}>睡眠記録（手動入力）</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+        <label>深い眠り (分):<input type="number" value={deep} onChange={e => setDeep(e.target.value)} style={inputStyle} /></label>
+        <label>浅い眠り (分):<input type="number" value={light} onChange={e => setLight(e.target.value)} style={inputStyle} /></label>
+        <label>REM睡眠 (分):<input type="number" value={rem} onChange={e => setRem(e.target.value)} style={inputStyle} /></label>
+        <label>目覚め (分):<input type="number" value={awake} onChange={e => setAwake(e.target.value)} style={inputStyle} /></label>
       </div>
-      <div style={{ marginBottom: '16px' }}>
-        <label>睡眠の質</label> 
-        <select value={quality} onChange={(e) => setQuality(e.target.value as any)} style={inputStyle}>
-          {Object.values(SleepRecord.Quality).map(q => <option key={q} value={q}>{q}</option>)}
-        </select>
-      </div>
-      <button onClick={handleSaveClick} style={buttonStyle}>保存する</button>
+      <button onClick={handleSave} style={buttonStyle}>保存する</button>
+      {feedback && <p>{feedback}</p>}
     </div>
   );
 };

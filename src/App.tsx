@@ -1,17 +1,14 @@
 // src/App.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
-// Hooks
 import { useAuth } from './hooks/useAuth';
-
-// Core Services & Models
 import { User } from './core/models/User';
 import { RecordManager } from './core/services/RecordManager';
 import { AnalysisEngine } from './core/services/AnalysisEngine';
 import { ReminderManager } from './core/services/ReminderManager';
 import { HealthRecord } from './core/models/HealthRecord';
+import { WeightRecord } from './core/models/WeightRecord';
 
-// UI Components
 import { AnalysisResult } from './ui/AnalysisResult';
 import { WeightInputForm } from './ui/WeightInputForm';
 import { SleepInputForm } from './ui/SleepInputForm';
@@ -22,7 +19,6 @@ import { ReminderSettings } from './ui/ReminderSettings';
 import { WeightDataDisplay } from './ui/WeightDataDisplay';
 import { SleepDataDisplay } from './ui/SleepDataDisplay';
 
-// Styles
 import { buttonStyle, cardStyle, inputStyle } from './ui/styles';
 
 const user = new User('user-001', '田中 太郎', 1.75);
@@ -49,6 +45,7 @@ function App() {
     updateLocalUI();
   }, [updateLocalUI]);
   
+  //【追加】レコード削除のハンドラ関数
   const handleDeleteRecord = async (recordId: string) => {
     await recordManager.deleteRecord(recordId);
     await updateLocalUI();
@@ -56,7 +53,7 @@ function App() {
   };
 
   const recordsForSelectedDate = useMemo(() => {
-    const selectedDate = new Date(currentDate + 'T00:00:00');
+    const selectedDate = new Date(currentDate);
     return allRecords.filter(record => {
       const recordDate = new Date(record.date);
       return recordDate.getFullYear() === selectedDate.getFullYear() &&
@@ -86,8 +83,6 @@ function App() {
         {accessToken ? (
           <div style={{...cardStyle, marginBottom: '32px' }}>
             <h2 style={{marginTop: 0}}>Google Fit データ連携</h2>
-            <p style={{color: 'green'}}>ログイン済みです。</p>
-            {/*【修正】currentDateのpropを削除*/}
             <WeightDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
             <SleepDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
           </div>
@@ -122,6 +117,7 @@ function App() {
           <WeightChart records={allRecords} />
         </div>
 
+        {/*【追加】onDeleteRecordプロパティをRecordListに渡す */}
         <RecordList records={recordsForSelectedDate} onDeleteRecord={handleDeleteRecord} />
       </main>
     </div>
