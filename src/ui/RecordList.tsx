@@ -4,6 +4,7 @@ import React from 'react';
 import { HealthRecord } from '../core/models/HealthRecord';
 import { WeightRecord } from '../core/models/WeightRecord';
 import { SleepRecord } from '../core/models/SleepRecord';
+import { cardStyle } from './styles';
 
 //【修正】Propsの型定義に、削除イベント用の関数を追加
 interface RecordListProps {
@@ -22,31 +23,18 @@ export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord 
   };
 
   return (
-    <div style={{ marginTop: '24px' }}>
-      <h3>記録一覧</h3>
+    <div style={{...cardStyle, marginTop: '24px' }}>
+      <h3 style={{ marginTop: 0, color: '#2c3e50' }}>記録一覧</h3>
       {sortedRecords.length === 0 ? (
-        <p>記録はまだありません。</p>
+        <p style={{ color: '#7f8c8d' }}>記録はまだありません。</p>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {sortedRecords.map((record) => {
-            const content = (
-              record instanceof WeightRecord ? (
-                <><strong>{record.weight} kg</strong> (体重)</>
-              ) : record instanceof SleepRecord ? (
-                <span style={{ color: '#336699' }}><strong>{record.sleepTime} 時間</strong> (睡眠 - 質: {record.quality})</span>
-              ) : null
-            );
-
+            // ... (contentの定義)
             return (
-              <li key={record.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', padding: '8px 4px' }}>
-                <span>{record.date.toLocaleDateString('ja-JP')} : {content}</span>
-                {/*【追加】削除ボタン*/}
-                <button 
-                  onClick={() => handleDeleteClick(record.id)}
-                  style={{ marginLeft: '16px', padding: '2px 8px', fontSize: '12px', color: 'white', backgroundColor: '#e74c3c', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  削除
-                </button>
+              <li key={record.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', padding: '12px 0' }}>
+                <span style={{ color: '#34495e' }}>{record.date.toLocaleDateString('ja-JP')} : {content}</span>
+                <button onClick={() => handleDeleteClick(record.id)} style={{ /* ... 削除ボタンのスタイル ... */ }}>削除</button>
               </li>
             );
           })}

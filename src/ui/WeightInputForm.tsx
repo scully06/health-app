@@ -5,6 +5,7 @@ import { User } from '../core/models/User';
 import { WeightRecord } from '../core/models/WeightRecord';
 import type { RecordManager } from '../core/services/RecordManager';
 import type { AnalysisEngine } from '../core/services/AnalysisEngine';
+import { cardStyle, inputStyle, buttonStyle } from './styles';
 
 // --- Propsの型定義を修正 ---
 interface WeightInputFormProps {
@@ -57,37 +58,18 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({
 
   // --- UIの描画 (View) ---
   return (
-    <div style={{ border: '1px solid #ccc', padding: '16px', borderRadius: '8px' }}>
-      <h3>こんにちは, {user.name} さん</h3>
-      <h4>体重を記録しましょう</h4>
-      
-      <div>
-        <label htmlFor="date-input">日付: </label>
-        <input
-          id="date-input"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
+    <div style={cardStyle}>
+      <h3 style={{ marginTop: 0, color: '#2c3e50' }}>体重を記録</h3>
+      <div style={{ marginBottom: '16px' }}>
+        <label htmlFor="date-input-weight">日付</label>
+        <input id="date-input-weight" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inputStyle} />
       </div>
-
-      <div style={{ marginTop: '8px' }}>
-        <label htmlFor="weight-input">体重 (kg): </label>
-        <input
-          id="weight-input"
-          type="number"
-          step="0.1"
-          value={weight}
-          onChange={(e) => setWeight(e.target.value)}
-          placeholder="例: 65.5"
-        />
+      <div style={{ marginBottom: '16px' }}>
+        <label htmlFor="weight-input">体重 (kg)</label>
+        <input id="weight-input" type="number" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="例: 65.5" style={inputStyle} />
       </div>
-
-      <button onClick={handleSaveClick} style={{ marginTop: '16px' }}>
-        保存する
-      </button>
-      
-      {feedbackMessage && <p style={{ marginTop: '12px', color: feedbackMessage.startsWith('エラー') ? 'red' : 'green' }}>{feedbackMessage}</p>}
+      <button onClick={handleSaveClick} style={buttonStyle}>保存する</button>
+      {feedbackMessage && <p style={{ marginTop: '12px', color: feedbackMessage.startsWith('エラー') ? '#e74c3c' : '#27ae60' }}>{feedbackMessage}</p>}
     </div>
   );
 };

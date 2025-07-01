@@ -141,9 +141,9 @@ function App() {
   };
 
   return (
-    <div className="App" style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
+        <div className="App" style={{ maxWidth: '960px', margin: '40px auto', padding: '20px', fontFamily: 'sans-serif' }}>
       <header>
-        <h1 style={{ textAlign: 'center', color: '#2c3e50' }}>健康管理アプリ</h1>
+        <h1 style={{ textAlign: 'center', color: '#2c3e50', marginBottom: '32px' }}>健康管理アプリ</h1>
         <div style={{ textAlign: 'center', margin: '16px 0' }}>
           <GoogleFitSyncButton onSyncSuccess={handleSyncSuccess} />
         </div>
@@ -151,7 +151,7 @@ function App() {
       <main>
         <AnalysisResult analysisText={analysisResult} />
         <hr style={{ margin: '32px 0', border: 0, borderTop: '1px solid #eee' }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' }}>
           <div style={{ flex: '1 1 300px' }}>
             {/*【修正】onRecordSavedには新しいハンドラを渡す*/}
             <WeightInputForm user={user} recordManager={recordManager} analysisEngine={analysisEngine} onRecordSaved={handleRecordSaved} />
