@@ -1,5 +1,7 @@
 // src/hooks/useWeightData.ts
 import { useState, useCallback } from 'react';
+// 【追加】作成した型をインポート
+import type { WeightDataResponse } from '../core/types/googleFit';
 
 export interface WeightDataPoint {
   date: Date;
@@ -41,19 +43,23 @@ export const useWeightData = (accessToken: string | null): WeightDataState => {
       if (!response.ok) {
         throw new Error(`体重データの取得に失敗: ${response.statusText}`);
       }
-      const data = await response.json();
+      // 【変更】any型ではなく、厳格な型を適用
+      const data: WeightDataResponse = await response.json();
       
       const formattedData: WeightDataPoint[] = data.bucket
-       .map((b: any) => {
-          const point = b.dataset[0]?.point[0];
-          if (!point || !point.value || point.value.length === 0) return null;
+       .map((bucket) => { // bの型が推論される
+          const point = bucket.dataset[0]?.point[0];
+          // 【変更】より安全なオプショナルチェイニングによるアクセス
+          const weightValue = point?.value[0]?.fpVal;
+
+          if (weightValue === undefined || weightValue === null) return null;
           
           return {
-            date: new Date(parseInt(b.startTimeMillis)),
-            weightKg: point.value[0].fpVal,
+            date: new Date(parseInt(bucket.startTimeMillis)),
+            weightKg: weightValue,
           };
         })
-       .filter((p: WeightDataPoint | null): p is WeightDataPoint => p !== null && p.weightKg > 0);
+       .filter((p): p is WeightDataPoint => p !== null && p.weightKg > 0);
 
       setWeightData(formattedData);
     } catch (e) {

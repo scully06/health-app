@@ -16,8 +16,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, on
 
   const handleSave = () => {
     const heightValueCm = parseFloat(height);
-    if (isNaN(heightValueCm) || heightValueCm <= 0) {
-      setFeedback('エラー: 正しい身長をセンチメートル単位で入力してください。(例: 175)');
+    // 【変更】より厳格なバリデーションを追加
+    const MIN_HEIGHT = 50; // cm
+    const MAX_HEIGHT = 300; // cm
+    if (isNaN(heightValueCm) || heightValueCm < MIN_HEIGHT || heightValueCm > MAX_HEIGHT) {
+      setFeedback(`エラー: 身長は${MIN_HEIGHT}cmから${MAX_HEIGHT}cmの間で入力してください。`);
       return;
     }
 
