@@ -1,5 +1,4 @@
 // src/App.tsx
-// import React, { useState, useEffect, useCallback, useMemo } from 'react'; // Reactは不要
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { useAuth } from './hooks/useAuth';
@@ -9,8 +8,6 @@ import { AnalysisEngine } from './core/services/AnalysisEngine';
 import { ReminderManager } from './core/services/ReminderManager';
 import { HealthRecord } from './core/models/HealthRecord';
 import { WeightRecord } from './core/models/WeightRecord';
-// import { FoodRecord } from './core/models/FoodRecord'; // 未使用
-// import { SleepRecord } from './core/models/SleepRecord'; // 未使用
 
 import { AnalysisResult } from './ui/AnalysisResult';
 import { WeightInputForm } from './ui/WeightInputForm';
@@ -62,7 +59,8 @@ function App() {
 
   const updateLocalUI = useCallback(async () => {
     try {
-      const latestRecords = await recordManager.getRecords(user.id);
+      // 【修正】getRecordsの呼び出しから引数を削除
+      const latestRecords = await recordManager.getRecords();
       setAllRecords([...latestRecords]);
       const resultText = await analysisEngine.analyze(latestRecords);
       setAnalysisResult(resultText);
@@ -71,7 +69,7 @@ function App() {
       console.error("UIの更新中にエラーが発生しました:", error);
       setAnalysisResult("データの処理中にエラーが発生しました。");
     }
-  }, [user.id]);
+  }, []); // 【修正】user.idへの依存がなくなったため、依存配列を空にする
 
   useEffect(() => {
     updateLocalUI();
