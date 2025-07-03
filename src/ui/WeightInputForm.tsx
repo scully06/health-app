@@ -36,16 +36,24 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
   }, [editingRecord]);
 
   const handleSaveClick = async () => {
+    // 【追加】未来日でないか検証
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const selectedDate = new Date(currentDate.replace(/-/g, '/'));
+
+    if (selectedDate > today) {
+      alert('未来の日付の記録はできません。');
+      return;
+    }
+
     const weightValue = parseFloat(weight);
     if (isNaN(weightValue) || weightValue <= 0) {
       setFeedbackMessage('エラー: 正しい体重を入力してください。');
       return;
     }
 
-    const recordId = isEditing && editingRecord ? editingRecord.id : `manual-weight-${new Date(currentDate).toISOString().split('T')[0]}`;
-    // 【修正】Safari対応
-    const recordDate = new Date(currentDate.replace(/-/g, '/'));
-    const newRecord = new WeightRecord(recordId, user.id, recordDate, weightValue);
+    const recordId = isEditing && editingRecord ? editingRecord.id : `manual-weight-${selectedDate.toISOString().split('T')[0]}`;
+    const newRecord = new WeightRecord(recordId, user.id, selectedDate, weightValue);
 
     try {
       await recordManager.saveRecord(newRecord);

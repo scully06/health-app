@@ -47,6 +47,16 @@ export const SleepInputForm: React.FC<SleepInputFormProps> = ({ user, recordMana
 
 
   const handleSave = async () => {
+    // 【追加】未来日でないか検証
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const selectedDate = new Date(currentDate.replace(/-/g, '/'));
+
+    if (selectedDate > today) {
+      alert('未来の日付の記録はできません。');
+      return;
+    }
+
     const deepValue = parseFloat(deep) || 0;
     const lightValue = parseFloat(light) || 0;
     const remValue = parseFloat(rem) || 0;
@@ -68,9 +78,7 @@ export const SleepInputForm: React.FC<SleepInputFormProps> = ({ user, recordMana
     };
 
     const recordId = isEditing && editingRecord ? editingRecord.id : `manual-sleep-${Date.now()}`;
-    // 【修正】Safari対応
-    const recordDate = new Date(currentDate.replace(/-/g, '/'));
-    const newRecord = new SleepRecord(recordId, user.id, recordDate, stageDurations);
+    const newRecord = new SleepRecord(recordId, user.id, selectedDate, stageDurations);
     
     try {
       await recordManager.saveRecord(newRecord);

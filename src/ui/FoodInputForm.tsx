@@ -46,7 +46,7 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
       setIsEditing(true);
     } else {
       setIsEditing(false);
-      if (!editingRecord) { // 他のフォーム編集中はリセットしない
+      if (!editingRecord) {
           setDescription('');
           setCalories('');
       }
@@ -85,6 +85,16 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
   };
 
   const handleSave = async () => {
+    // 【追加】未来日でないか検証
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // 今日の終わりまでの記録を許可
+    const selectedDate = new Date(currentDate.replace(/-/g, '/'));
+
+    if (selectedDate > today) {
+      alert('未来の日付の記録はできません。');
+      return;
+    }
+
     const gramsValue = parseFloat(grams);
     const caloriesValue = parseInt(calories, 10);
 
@@ -105,8 +115,7 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     const newRecord = new FoodRecord(
       recordId,
       user.id,
-      // 【修正】Safari対応
-      new Date(currentDate.replace(/-/g, '/')),
+      selectedDate,
       mealType,
       description.trim(),
       caloriesValue

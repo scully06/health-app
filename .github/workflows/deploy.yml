@@ -29,15 +29,15 @@ jobs:
 
       # 3. 依存関係をインストール
       - name: Install dependencies
+        # 【変更】npm install から npm ci に変更
         run: npm ci
 
       # 4. アプリケーションをビルド
-      # GitHubのシークレットから環境変数を読み込んでビルドを実行
       - name: Build
         run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-
+        
       # 5. GitHub Pagesにデプロイ
       # ビルド成果物（distディレクトリ）をgh-pagesブランチにプッシュ
       - name: Deploy
