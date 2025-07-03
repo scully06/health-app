@@ -5,33 +5,47 @@ import { cardStyle, inputStyle, buttonStyle } from './styles';
 
 interface SettingsScreenProps {
   user: User;
-  onBack: () => void; // メイン画面に戻るための関数
-  onHeightChange: (newHeight: number) => void; // 身長を更新するための関数
+  onBack: () => void;
+  // 【確認】propsの型定義
+  onSettingsChange: (settings: { height: number; targetWeight?: number; targetCalories?: number }) => void;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, onHeightChange }) => {
-  // 【変更】propsから受け取った身長(m)をcmに変換して初期値として設定
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, onSettingsChange }) => {
   const [height, setHeight] = useState((user.height * 100).toString());
+  const [targetWeight, setTargetWeight] = useState(user.targetWeight?.toString() || '');
+  const [targetCalories, setTargetCalories] = useState(user.targetCalories?.toString() || '');
   const [feedback, setFeedback] = useState('');
 
   const handleSave = () => {
     const heightValueCm = parseFloat(height);
-    // 【変更】より厳格なバリデーションを追加
-    const MIN_HEIGHT = 50; // cm
-    const MAX_HEIGHT = 300; // cm
+    const MIN_HEIGHT = 50;
+    const MAX_HEIGHT = 300;
     if (isNaN(heightValueCm) || heightValueCm < MIN_HEIGHT || heightValueCm > MAX_HEIGHT) {
       setFeedback(`エラー: 身長は${MIN_HEIGHT}cmから${MAX_HEIGHT}cmの間で入力してください。`);
       return;
     }
 
-    // 【変更】cmで入力された値をmに変換して親コンポーネントに渡す
-    onHeightChange(heightValueCm / 100);
-    setFeedback('身長を更新しました！');
+    const targetWeightValue = targetWeight ? parseFloat(targetWeight) : undefined;
+    if (targetWeightValue !== undefined && (isNaN(targetWeightValue) || targetWeightValue <= 0)) {
+        setFeedback('エラー: 正しい目標体重を入力してください。');
+        return;
+    }
+    
+    const targetCaloriesValue = targetCalories ? parseInt(targetCalories, 10) : undefined;
+    if (targetCaloriesValue !== undefined && (isNaN(targetCaloriesValue) || targetCaloriesValue < 0)) {
+        setFeedback('エラー: 正しい目標カロリーを入力してください。');
+        return;
+    }
 
-    // 3秒後にフィードバックを消す
-    setTimeout(() => {
-      setFeedback('');
-    }, 3000);
+    // 【確認】設定変更を親コンポーネントに通知
+    onSettingsChange({
+      height: heightValueCm / 100,
+      targetWeight: targetWeightValue,
+      targetCalories: targetCaloriesValue,
+    });
+    
+    setFeedback('設定を更新しました！');
+    setTimeout(() => setFeedback(''), 3000);
   };
 
   return (
@@ -46,20 +60,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, on
       <div>
         <h3 style={{ marginTop: 0, color: '#2c3e50' }}>ユーザー情報</h3>
         <div style={{ marginBottom: '16px' }}>
-          {/* 【変更】ラベル、step、placeholderをcm単位に修正 */}
           <label htmlFor="height-input">身長 (cm)</label>
-          <input
-            id="height-input"
-            type="number"
-            step="1"
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
-            placeholder="例: 175"
-            style={inputStyle}
-          />
+          <input id="height-input" type="number" step="1" value={height} onChange={(e) => setHeight(e.target.value)} placeholder="例: 175" style={inputStyle} />
         </div>
+        
+        {/* 【確認】目標設定フォーム */}
+        <hr style={{ margin: '24px 0', border: 0, borderTop: '1px solid #eee' }} />
+        <h3 style={{ marginTop: 0, color: '#2c3e50' }}>目標設定</h3>
+        <div style={{ marginBottom: '16px' }}>
+            <label htmlFor="target-weight-input">目標体重 (kg)</label>
+            <input id="target-weight-input" type="number" step="0.1" value={targetWeight} onChange={e => setTargetWeight(e.target.value)} placeholder="未設定" style={inputStyle} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+            <label htmlFor="target-calories-input">1日の目標摂取カロリー (kcal)</label>
+            <input id="target-calories-input" type="number" step="10" value={targetCalories} onChange={e => setTargetCalories(e.target.value)} placeholder="未設定" style={inputStyle} />
+        </div>
+
         <button onClick={handleSave} style={buttonStyle}>
-          身長を保存
+          設定を保存
         </button>
         {feedback && <p style={{ marginTop: '12px', color: feedback.startsWith('エラー') ? '#e74c3c' : '#27ae60' }}>{feedback}</p>}
       </div>
