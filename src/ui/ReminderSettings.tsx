@@ -1,17 +1,18 @@
 // src/ui/ReminderSettings.tsx
 
 import React, { useState, useEffect } from 'react';
-import type { ReminderManager, ReminderSettings } from '../core/services/ReminderManager';
+// import type { ReminderManager, ReminderSettings } from '../core/services/ReminderManager'; // 変更前
+import type { ReminderManager, ReminderSettings as ReminderSettingsType } from '../core/services/ReminderManager'; // 変更後
 
 interface ReminderSettingsProps {
   reminderManager: ReminderManager;
 }
 
 export const ReminderSettings: React.FC<ReminderSettingsProps> = ({ reminderManager }) => {
-  const [settings, setSettings] = useState<ReminderSettings>(reminderManager.getSettings());
+  // const [settings, setSettings] = useState<ReminderSettings>(reminderManager.getSettings()); // 変更前
+  const [settings, setSettings] = useState<ReminderSettingsType>(reminderManager.getSettings()); // 変更後
 
   useEffect(() => {
-    // 初回に通知許可を求める（既に許可/拒否済みでなければ）
     if (Notification.permission === 'default') {
       Notification.requestPermission();
     }

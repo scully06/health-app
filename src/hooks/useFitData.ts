@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react'; // 変更後
 
 // 型定義
 export interface WeightDataPoint { date: Date; weightKg: number; }

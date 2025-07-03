@@ -100,7 +100,7 @@ export class RecordManager implements IExtendedRecordManager {
     this.saveRecordsToStorage();
   }
 
-  public async getRecords(userId: string): Promise<HealthRecord[]> {
+  public async getRecords(): Promise<HealthRecord[]> { // 変更後
     return [...this.records];
   }
 

@@ -1,5 +1,6 @@
 // src/App.tsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+// import React, { useState, useEffect, useCallback, useMemo } from 'react'; // Reactは不要
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { useAuth } from './hooks/useAuth';
 import { User } from './core/models/User';
@@ -8,8 +9,8 @@ import { AnalysisEngine } from './core/services/AnalysisEngine';
 import { ReminderManager } from './core/services/ReminderManager';
 import { HealthRecord } from './core/models/HealthRecord';
 import { WeightRecord } from './core/models/WeightRecord';
-import { FoodRecord } from './core/models/FoodRecord';
-import { SleepRecord } from './core/models/SleepRecord';
+// import { FoodRecord } from './core/models/FoodRecord'; // 未使用
+// import { SleepRecord } from './core/models/SleepRecord'; // 未使用
 
 import { AnalysisResult } from './ui/AnalysisResult';
 import { WeightInputForm } from './ui/WeightInputForm';
@@ -33,7 +34,6 @@ const reminderManager = new ReminderManager();
 
 type Screen = 'main' | 'settings';
 
-// Google認証が有効かどうかを判定するフラグ
 export const isGoogleAuthEnabled = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function App() {
@@ -61,11 +61,16 @@ function App() {
   const [editingRecord, setEditingRecord] = useState<HealthRecord | null>(null);
 
   const updateLocalUI = useCallback(async () => {
-    const latestRecords = await recordManager.getRecords(user.id);
-    setAllRecords([...latestRecords]);
-    const resultText = await analysisEngine.analyze(latestRecords);
-    setAnalysisResult(resultText);
-    setEditingRecord(null);
+    try {
+      const latestRecords = await recordManager.getRecords(user.id);
+      setAllRecords([...latestRecords]);
+      const resultText = await analysisEngine.analyze(latestRecords);
+      setAnalysisResult(resultText);
+      setEditingRecord(null);
+    } catch (error) {
+      console.error("UIの更新中にエラーが発生しました:", error);
+      setAnalysisResult("データの処理中にエラーが発生しました。");
+    }
   }, [user.id]);
 
   useEffect(() => {
