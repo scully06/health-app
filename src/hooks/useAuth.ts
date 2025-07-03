@@ -1,8 +1,7 @@
 // src/hooks/useAuth.ts
 import { useState, useEffect, useCallback } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
-// 【追加】App.tsxからフラグをインポート
-import { isGoogleAuthEnabled } from '../App';
+import { getGoogleClientId } from '../utils/auth'; // 【変更】
 
 interface AuthState {
   accessToken: string | null;
@@ -11,19 +10,20 @@ interface AuthState {
   logout: () => void;
 }
 
-// 【追加】Google認証が無効な場合に返すダミーの（空の）状態
+const isGoogleAuthEnabled = !!getGoogleClientId(); // 【変更】
+
 const disabledAuthState: AuthState = {
   accessToken: null,
   isLoading: false,
-  login: () => console.warn('Google Auth is not configured.'),
+  login: () => alert('Google Client IDが設定されていません。設定画面から設定してください。'),
   logout: () => {},
 };
 
 export const useAuth = (): AuthState => {
-  // 【最重要】Google認証が無効な場合は、ここで処理を中断し、ダミーの値を返す
   if (!isGoogleAuthEnabled) {
     return disabledAuthState;
   }
+
 
   // --- 以下は、Google認証が有効な場合のみ実行される ---
 
@@ -58,7 +58,6 @@ export const useAuth = (): AuthState => {
     }
   }, []);
   
-  // このフックは isGoogleAuthEnabled が true の場合のみ呼び出される
   const login = useGoogleLogin({
     onSuccess: (codeResponse) => fetchAccessToken(codeResponse.code),
     onError: error => console.error('Googleログインに失敗:', error),

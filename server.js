@@ -1,4 +1,4 @@
-// server.js (または server.mjs)
+// server.js
 
 import express from 'express';
 import dotenv from 'dotenv';
@@ -19,7 +19,6 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// 【変更】OAuth2ClientとgenAIの初期化を、変数が存在する場合のみ行う
 let oauth2Client;
 if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
   oauth2Client = new OAuth2Client(
@@ -29,19 +28,21 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
   );
 }
 
-let genAI;
 let model;
 if (GEMINI_API_KEY) {
-  genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  // 【変更】モデル名を最新のものに更新
+  model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 }
 
-//=================================
-// APIルートの定義
-//=================================
+app.get('/api/status', (req, res) => {
+  res.json({
+    isGoogleAuthReady: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET),
+    isGeminiReady: !!GEMINI_API_KEY,
+  });
+});
 
 app.post('/api/auth/google', async (req, res) => {
-  // 【変更】環境変数が設定されていない場合、503エラーを返す
   if (!oauth2Client) {
     return res.status(503).json({ error: 'Google OAuth is not configured on the server.' });
   }
@@ -55,13 +56,15 @@ app.post('/api/auth/google', async (req, res) => {
     console.log('[Auth Server] Googleからトークンを正常に取得しました。');
     res.json(tokens);
   } catch (error) {
-    console.error('Failed to exchange auth code for tokens:', error.message);
-    res.status(500).json({ error: 'Failed to authenticate with Google.' });
+    console.error('トークン交換エラー:', error.response?.data || error.message);
+    res.status(500).json({ 
+      error: 'Googleとの認証に失敗しました。',
+      details: error.response?.data || error.message
+    });
   }
 });
 
 app.post('/api/analyze', async (req, res) => {
-  // 【変更】環境変数が設定されていない場合、503エラーを返す
   if (!model) {
     return res.status(503).json({ error: 'Gemini API is not configured on the server.' });
   }
@@ -82,19 +85,18 @@ app.post('/api/analyze', async (req, res) => {
     res.json({ analysisText: text });
 
   } catch (error) {
-    console.error('Error calling Gemini API:', error.message);
+    console.error('Error calling Gemini API:', error);
     res.status(500).json({ error: 'Geminiによる分析に失敗しました。' });
   }
 });
 
-// ... (その他のAPIルートやヘルパー関数は変更なし)
-// ... createPromptForGeminiなど ...
+
 function createPromptForGemini(records) {
   const recordsText = records.map(r => {
     let detail = '';
     if (r.weight) {
       detail = `体重: ${r.weight}kg`;
-    } else if (r.stageDurations) { // sleepTimeからstageDurationsに変更
+    } else if (r.stageDurations) {
       const totalHours = Object.values(r.stageDurations).reduce((sum, current) => sum + (current || 0), 0) / 60;
       detail = `睡眠: ${totalHours.toFixed(1)}h`;
     } else if (r.mealType) {
@@ -116,7 +118,6 @@ function createPromptForGemini(records) {
     - 「睡眠時間が短い日は、翌日の体重に影響が出ているようです。今夜は少し早めに休んでみてはいかがでしょうか？」
   `;
 }
-
 
 app.listen(PORT, () => {
   console.log(`Authentication and Analysis server is running on http://localhost:${PORT}`);
