@@ -1,10 +1,11 @@
 // src/ui/WeightInputForm.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { User } from '../core/models/User';
 import { WeightRecord } from '../core/models/WeightRecord';
 import type { RecordManager } from '../core/services/RecordManager';
 import type { AnalysisEngine } from '../core/services/AnalysisEngine';
 import { cardStyle, inputStyle, buttonStyle } from './styles';
+import { HealthRecord } from '../core/models/HealthRecord';
 
 interface WeightInputFormProps {
   user: User;
@@ -12,11 +13,25 @@ interface WeightInputFormProps {
   analysisEngine: AnalysisEngine;
   onRecordSaved: () => void;
   currentDate: string;
+  editingRecord: HealthRecord | null;
 }
 
-export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordManager, analysisEngine, onRecordSaved, currentDate }) => {
+export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordManager, analysisEngine, onRecordSaved, currentDate, editingRecord }) => {
   const [weight, setWeight] = useState<string>('');
   const [feedbackMessage, setFeedbackMessage] = useState<string>('');
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (editingRecord && editingRecord instanceof WeightRecord) {
+      setWeight(editingRecord.weight.toString());
+      setIsEditing(true);
+      setFeedbackMessage('記録を編集中...');
+    } else {
+      setWeight('');
+      setIsEditing(false);
+      setFeedbackMessage('');
+    }
+  }, [editingRecord]);
 
   const handleSaveClick = async () => {
     const weightValue = parseFloat(weight);
@@ -25,8 +40,7 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
       return;
     }
 
-    //【重要】日付に基づいた一意なIDを生成
-    const recordId = `manual-weight-${new Date(currentDate).toISOString().split('T')[0]}`;
+    const recordId = isEditing && editingRecord ? editingRecord.id : `manual-weight-${new Date(currentDate).toISOString().split('T')[0]}`;
     const newRecord = new WeightRecord(recordId, user.id, new Date(currentDate), weightValue);
 
     try {
@@ -43,13 +57,13 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
   };
 
   return (
-    <div style={cardStyle}>
-      <h3 style={{ marginTop: 0, color: '#2c3e50' }}>体重を記録</h3>
+    <div style={isEditing ? {...cardStyle, border: '2px solid #3498db'} : cardStyle}>
+      <h3 style={{ marginTop: 0, color: '#2c3e50' }}>{isEditing ? '体重を編集' : '体重を記録'}</h3>
       <div style={{ marginBottom: '16px' }}>
         <label htmlFor="weight-input">体重 (kg)</label>
         <input id="weight-input" type="number" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="例: 65.5" style={inputStyle} />
       </div>
-      <button onClick={handleSaveClick} style={buttonStyle}>保存する</button>
+      <button onClick={handleSaveClick} style={buttonStyle}>{isEditing ? '更新する' : '保存する'}</button>
       {feedbackMessage && <p style={{ marginTop: '12px', color: feedbackMessage.startsWith('エラー') ? '#e74c3c' : '#27ae60' }}>{feedbackMessage}</p>}
     </div>
   );

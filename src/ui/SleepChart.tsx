@@ -29,27 +29,42 @@ interface SleepChartProps {
 }
 
 export const SleepChart: React.FC<SleepChartProps> = ({ records }) => {
-  // 睡眠記録のみを抽出し、日付の古い順にソート
   const sleepRecords = records
     .filter((r): r is SleepRecord => r instanceof SleepRecord)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // グラフ用のデータを作成
+  // グラフのラベル（日付）
+  const labels = sleepRecords.map(r => new Date(r.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }));
+
+  // 【変更】睡眠ステージごとのデータセットを作成
   const data = {
-    labels: sleepRecords.map(r => new Date(r.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })),
+    labels: labels,
     datasets: [
       {
-        label: '合計睡眠時間 (時間)',
-        // getTotalHours()メソッドで合計睡眠時間を取得
-        data: sleepRecords.map(r => r.getTotalHours()),
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1,
+        label: '深い睡眠',
+        // 各記録から「深い睡眠」の時間（分→時間）を抽出
+        data: sleepRecords.map(r => (r.stageDurations.deep || 0) / 60),
+        backgroundColor: 'rgba(25, 25, 112, 0.7)', // 深い青
+      },
+      {
+        label: '浅い睡眠',
+        data: sleepRecords.map(r => (r.stageDurations.light || 0) / 60),
+        backgroundColor: 'rgba(54, 162, 235, 0.7)', // 青
+      },
+      {
+        label: 'REM睡眠',
+        data: sleepRecords.map(r => (r.stageDurations.rem || 0) / 60),
+        backgroundColor: 'rgba(153, 102, 255, 0.7)', // 紫
+      },
+      {
+        label: '覚醒',
+        data: sleepRecords.map(r => (r.stageDurations.awake || 0) / 60),
+        backgroundColor: 'rgba(201, 203, 207, 0.7)', // グレー
       },
     ],
   };
 
-  // グラフのオプションを設定
+  // 【変更】積み上げグラフのためのオプション設定
   const options = {
     responsive: true,
     plugins: {
@@ -58,11 +73,29 @@ export const SleepChart: React.FC<SleepChartProps> = ({ records }) => {
       },
       title: {
         display: true,
-        text: '睡眠時間の推移',
+        text: '睡眠時間の内訳',
       },
+      tooltip: {
+        // ツールチップに合計時間を表示する
+        callbacks: {
+          footer: (tooltipItems: any) => {
+            let total = 0;
+            tooltipItems.forEach((item: any) => {
+              total += item.parsed.y;
+            });
+            return '合計: ' + total.toFixed(1) + ' 時間';
+          }
+        }
+      }
     },
     scales: {
+      x: {
+        // X軸を積み上げ表示に設定
+        stacked: true,
+      },
       y: {
+        // Y軸を積み上げ表示に設定
+        stacked: true,
         beginAtZero: true,
         title: {
             display: true,
@@ -72,6 +105,5 @@ export const SleepChart: React.FC<SleepChartProps> = ({ records }) => {
     }
   };
 
-  // @ts-ignore
   return <Bar options={options} data={data} />;
 };

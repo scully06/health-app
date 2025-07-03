@@ -8,6 +8,8 @@ import { FoodRecord } from '../models/FoodRecord';
 
 export interface IExtendedRecordManager extends IRecordManager {
   deleteRecord(recordId: string): Promise<void>;
+  // 【追加】
+  overwriteAllRecords(records: HealthRecord[]): Promise<void>;
 }
 
 export class RecordManager implements IExtendedRecordManager {
@@ -18,6 +20,28 @@ export class RecordManager implements IExtendedRecordManager {
     console.log('[RecordManager] 記録管理者が起動しました。');
     this.loadRecordsFromStorage();
   }
+  
+  // 【追加】インポート機能のために、全データを一括で上書きするメソッド
+  public async overwriteAllRecords(newRecords: HealthRecord[]): Promise<void> {
+    try {
+      // オブジェクトの配列をインスタンスに再変換
+      this.records = newRecords.map((obj: any) => {
+        const recordDate = new Date(obj.date);
+        if ('weight' in obj) return new WeightRecord(obj.id, obj.userId, recordDate, obj.weight);
+        if ('stageDurations' in obj) return new SleepRecord(obj.id, obj.userId, recordDate, obj.stageDurations);
+        if ('mealType' in obj) return new FoodRecord(obj.id, obj.userId, recordDate, obj.mealType, obj.description, obj.calories);
+        return null;
+      }).filter(Boolean) as HealthRecord[];
+
+      this.saveRecordsToStorage();
+      console.log(`[RecordManager] 全記録をインポートデータで上書きしました。件数: ${this.records.length}`);
+    } catch(error) {
+      console.error('[RecordManager] データのインポートに失敗しました。', error);
+      // エラーを呼び出し元に伝える
+      throw new Error('インポートに失敗しました。ファイルの形式が正しくない可能性があります。');
+    }
+  }
+
 
   private loadRecordsFromStorage(): void {
     try {
@@ -48,39 +72,27 @@ export class RecordManager implements IExtendedRecordManager {
     }
   }
   
-  /**
-   *【重要】重複記録防止ロジックを組み込んだsaveRecordメソッド
-   */
   public async saveRecord(record: HealthRecord): Promise<void> {
     const foundIndex = this.records.findIndex(r => r.id === record.id);
 
     if (foundIndex !== -1) {
-      // 既存のIDがあれば、それは「編集」なので上書きする
       this.records[foundIndex] = record;
       console.log(`[RecordManager] 記録を上書きしました (ID: ${record.id})`);
     } else {
-      // IDがなければ新規。ただし、手動の体重・睡眠は1日1件の重複チェックを行う
-      if (record instanceof WeightRecord || record instanceof SleepRecord) {
-        // Google Fitからの同期データ('gf-'で始まるID)は、このチェックをスキップ
-        if (!record.id.startsWith('gf-')) {
+      if (record instanceof WeightRecord && !record.id.startsWith('gf-')) {
           const dailyDuplicateIndex = this.records.findIndex(r =>
-            !r.id.startsWith('gf-') && // 手動入力同士で比較
-            r.constructor === record.constructor && // 同じ種類の記録か(WeightRecord vs WeightRecord)
-            new Date(r.date).toDateString() === new Date(record.date).toDateString() // 同じ日付か
+            !r.id.startsWith('gf-') &&
+            r instanceof WeightRecord &&
+            new Date(r.date).toDateString() === new Date(record.date).toDateString()
           );
 
           if (dailyDuplicateIndex !== -1) {
-            //【重要】重複が見つかった場合はアラートを出し、保存しない
-            alert(`この日付の${record instanceof WeightRecord ? '体重' : '睡眠'}記録は既に存在します。既存の記録を上書きします。`);
-            this.records[dailyDuplicateIndex] = record; // 重複した古い方を上書きする
+            alert(`この日付の体重記録は既に存在します。既存の記録を上書きします。`);
+            this.records[dailyDuplicateIndex] = record;
           } else {
             this.records.push(record);
           }
-        } else {
-           this.records.push(record); // Google Fitのデータは重複チェックせず追加
-        }
       } else {
-        // 食事記録は重複チェックなしで常に追加
         this.records.push(record);
       }
     }

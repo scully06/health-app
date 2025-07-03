@@ -21,7 +21,6 @@ import { SleepDataDisplay } from './ui/SleepDataDisplay';
 import { DisclaimerModal } from './ui/DisclaimerModal';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { GoalStatus } from './ui/GoalStatus';
-// 【追加】SleepChartコンポーネントをインポート
 import { SleepChart } from './ui/SleepChart';
 
 import { buttonStyle, cardStyle, inputStyle } from './ui/styles';
@@ -54,12 +53,14 @@ function App() {
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<Screen>('main');
+  const [editingRecord, setEditingRecord] = useState<HealthRecord | null>(null);
 
   const updateLocalUI = useCallback(async () => {
     const latestRecords = await recordManager.getRecords(user.id);
     setAllRecords([...latestRecords]);
     const resultText = await analysisEngine.analyze(latestRecords);
     setAnalysisResult(resultText);
+    setEditingRecord(null);
   }, [user.id]);
 
   useEffect(() => {
@@ -84,6 +85,15 @@ function App() {
     alert('記録を削除しました。');
   };
 
+  const handleEditRecord = (record: HealthRecord) => {
+    setEditingRecord(record);
+    setCurrentDate(new Date(record.date).toISOString().split('T')[0]);
+    const dataInputSection = document.getElementById('data-input-section');
+    if (dataInputSection) {
+      dataInputSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const handleSettingsChange = (settings: { height: number; targetWeight?: number; targetCalories?: number }) => {
     const updatedUser = new User(
       user.id, 
@@ -104,6 +114,20 @@ function App() {
       localStorage.setItem('userTargetCalories', settings.targetCalories.toString());
     } else {
       localStorage.removeItem('userTargetCalories');
+    }
+  };
+  
+  // 【追加】インポートデータを処理するハンドラ
+  const handleImportData = async (importedRecords: HealthRecord[]) => {
+    try {
+      await recordManager.overwriteAllRecords(importedRecords);
+      // UIを即時更新
+      await updateLocalUI();
+      alert('データのインポートが完了しました。');
+      // メイン画面に戻る
+      setCurrentScreen('main');
+    } catch(error: any) {
+      alert(error.message);
     }
   };
 
@@ -171,16 +195,16 @@ function App() {
               </div>
             </div>
             
-            <div style={{ ...cardStyle }}>
+            <div id="data-input-section" style={{ ...cardStyle }}>
               <h2 style={{marginTop: 0}}>データ入力</h2>
               <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                 <label htmlFor="current-date-picker" style={{fontWeight: 'bold'}}>表示・記録する日付:</label>
                 <input id="current-date-picker" type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} style={{ ...inputStyle, width: 'auto', marginLeft: '8px' }}/>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-                <FoodInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} />
-                <WeightInputForm user={user} recordManager={recordManager} analysisEngine={analysisEngine} onRecordSaved={updateLocalUI} currentDate={currentDate} />
-                <SleepInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} />
+                <FoodInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} editingRecord={editingRecord} />
+                <WeightInputForm user={user} recordManager={recordManager} analysisEngine={analysisEngine} onRecordSaved={updateLocalUI} currentDate={currentDate} editingRecord={editingRecord} />
+                <SleepInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} editingRecord={editingRecord} />
               </div>
             </div>
 
@@ -188,18 +212,20 @@ function App() {
               <WeightChart records={allRecords} />
             </div>
             
-            {/* 【追加】SleepChartコンポーネントを配置 */}
             <div style={{ marginTop: '32px' }}>
               <SleepChart records={allRecords} />
             </div>
 
-            <RecordList records={recordsForSelectedDate} onDeleteRecord={handleDeleteRecord} />
+            <RecordList records={recordsForSelectedDate} onDeleteRecord={handleDeleteRecord} onEditRecord={handleEditRecord} />
           </main>
         ) : (
+          // 【変更】必要なpropsをSettingsScreenに渡す
           <SettingsScreen 
             user={user} 
             onBack={() => setCurrentScreen('main')}
             onSettingsChange={handleSettingsChange}
+            allRecords={allRecords}
+            onImportData={handleImportData}
           />
         )}
       </div>

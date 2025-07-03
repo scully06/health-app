@@ -1,19 +1,21 @@
 // src/ui/FoodInputForm.tsx
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../core/models/User';
 import { FoodRecord, MealType, type MealTypeValue } from '../core/models/FoodRecord';
 import type { RecordManager } from '../core/services/RecordManager';
 import { cardStyle, inputStyle, buttonStyle } from './styles';
 import { foodDatabaseService, type FoodDataItem } from '../core/services/FoodDatabaseService';
+import { HealthRecord } from '../core/models/HealthRecord';
 
 interface FoodInputFormProps {
   user: User;
   recordManager: RecordManager;
   onRecordSaved: () => void;
   currentDate: string;
+  editingRecord: HealthRecord | null;
 }
 
-export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManager, onRecordSaved, currentDate }) => {
+export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManager, onRecordSaved, currentDate, editingRecord }) => {
   const [mealType, setMealType] = useState<MealTypeValue>(MealType.BREAKFAST);
   const [description, setDescription] = useState('');
   const [calories, setCalories] = useState<string>('');
@@ -23,16 +25,33 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<FoodDataItem[]>([]);
   const [isDbLoading, setIsDbLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // 初回に一度だけデータベースを初期化する
   useEffect(() => {
     foodDatabaseService.initialize().then(() => {
       setIsDbLoading(false);
       console.log('[FoodInputForm] データベースの準備が完了しました。');
     });
   }, []);
+  
+  useEffect(() => {
+    if (editingRecord && editingRecord instanceof FoodRecord) {
+      setMealType(editingRecord.mealType);
+      setDescription(editingRecord.description);
+      setCalories(editingRecord.calories.toString());
+      setGrams('100'); //グラムはリセット
+      setCaloriesPer100g(null); // 自動計算はオフ
+      setSearchTerm('');
+      setSearchResults([]);
+      setIsEditing(true);
+    } else {
+      // 編集モードが解除されたらフォームをリセット
+      setIsEditing(false);
+      setDescription('');
+      setCalories('');
+    }
+  }, [editingRecord]);
 
-  // 検索キーワードが変更された時に検索を実行する
   useEffect(() => {
     if (isDbLoading || searchTerm.length < 1) {
       setSearchResults([]);
@@ -42,7 +61,6 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     setSearchResults(results);
   }, [searchTerm, isDbLoading]);
 
-  // 検索結果から食品を選択した時の処理
   const handleSelectProduct = (food: FoodDataItem) => {
     setDescription(food.name);
     setCaloriesPer100g(food.calories);
@@ -52,7 +70,6 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     setSearchResults([]);
   };
   
-  // 合計カロリーの自動計算
   useEffect(() => {
     if (caloriesPer100g === null || grams === '') return;
     const gramsValue = parseFloat(grams);
@@ -61,13 +78,11 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     setCalories(Math.round(calculatedCalories).toString());
   }, [grams, caloriesPer100g]);
 
-  // 合計カロリー欄を手動で編集した時の処理
   const handleCaloriesManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCalories(e.target.value);
-    setCaloriesPer100g(null); // 自動計算をオフにする
+    setCaloriesPer100g(null);
   };
 
-  // 保存ボタンクリック時の処理とバリデーション
   const handleSave = async () => {
     const gramsValue = parseFloat(grams);
     const caloriesValue = parseInt(calories, 10);
@@ -85,8 +100,9 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
       return;
     }
 
+    const recordId = isEditing && editingRecord ? editingRecord.id : `food-${Date.now()}`;
     const newRecord = new FoodRecord(
-      `food-${Date.now()}`,
+      recordId,
       user.id,
       new Date(currentDate),
       mealType,
@@ -96,7 +112,6 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     
     await recordManager.saveRecord(newRecord);
     
-    // フォームをリセット
     setDescription('');
     setCalories('');
     setGrams('100');
@@ -106,8 +121,8 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
   };
 
   return (
-    <div style={cardStyle}>
-      <h3 style={{ marginTop: 0, color: '#2c3e50' }}>食事を検索・記録</h3>
+    <div style={isEditing ? {...cardStyle, border: '2px solid #3498db'} : cardStyle}>
+      <h3 style={{ marginTop: 0, color: '#2c3e50' }}>{isEditing ? '食事を編集' : '食事を検索・記録'}</h3>
       
       <div style={{ marginBottom: '16px', position: 'relative' }}>
         <label>食品名で検索</label>
@@ -164,7 +179,7 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
           />
         </div>
       </div>
-      <button onClick={handleSave} style={buttonStyle}>この食事を記録</button>
+      <button onClick={handleSave} style={buttonStyle}>{isEditing ? '更新する' : 'この食事を記録'}</button>
     </div>
   );
 };

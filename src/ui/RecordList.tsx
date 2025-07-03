@@ -6,9 +6,12 @@ import { SleepRecord, type SleepStageDurations } from '../core/models/SleepRecor
 import { FoodRecord } from '../core/models/FoodRecord';
 import { cardStyle } from './styles';
 
+// 【重要】ここの型定義を修正します
 interface RecordListProps {
   records: HealthRecord[];
-  onDeleteRecord: (recordId: string) => void; //【追加】削除関数のためのprop
+  onDeleteRecord: (recordId: string) => void;
+  // 'onEditRecord'プロパティを追加
+  onEditRecord: (record: HealthRecord) => void;
 }
 
 const formatSleepDetails = (durations: SleepStageDurations): string => {
@@ -25,7 +28,8 @@ const formatSleepDetails = (durations: SleepStageDurations): string => {
   return `合計 ${totalHours}時間 (${details})`;
 };
 
-export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord }) => {
+// 【重要】コンポーネントの引数に onEditRecord を追加します
+export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord, onEditRecord }) => {
   const sortedRecords = [...records].sort((a, b) => {
     const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
     if (dateDiff !== 0) return dateDiff;
@@ -36,7 +40,6 @@ export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord 
     .filter((r): r is FoodRecord => r instanceof FoodRecord)
     .reduce((sum, r) => sum + r.calories, 0);
 
-  //【追加】削除ボタンがクリックされたときのハンドラ
   const handleDeleteClick = (recordId: string) => {
     if (window.confirm('この記録を本当に削除しますか？')) {
       onDeleteRecord(recordId);
@@ -62,8 +65,11 @@ export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord 
             return (
               <li key={record.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', padding: '12px 0' }}>
                 <span style={{ color: '#34495e' }}>{content}</span>
-                {/*【追加】削除ボタンのUI */}
-                <button onClick={() => handleDeleteClick(record.id)} style={{ marginLeft: '16px', padding: '2px 8px', fontSize: '12px', color: 'white', backgroundColor: '#e74c3c', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>削除</button>
+                <div>
+                  {/* 【重要】onClickで onEditRecord を呼び出せるようになります */}
+                  <button onClick={() => onEditRecord(record)} style={{ marginLeft: '8px', padding: '2px 8px', fontSize: '12px', color: 'white', backgroundColor: '#3498db', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>編集</button>
+                  <button onClick={() => handleDeleteClick(record.id)} style={{ marginLeft: '8px', padding: '2px 8px', fontSize: '12px', color: 'white', backgroundColor: '#e74c3c', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>削除</button>
+                </div>
               </li>
             );
           })}
