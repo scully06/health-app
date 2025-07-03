@@ -6,6 +6,7 @@ import { User } from './core/models/User';
 import { RecordManager } from './core/services/RecordManager';
 import { AnalysisEngine } from './core/services/AnalysisEngine';
 import { ReminderManager } from './core/services/ReminderManager';
+import { AchievementManager,type Achievement } from './core/services/AchievementManager';
 import { HealthRecord } from './core/models/HealthRecord';
 import { WeightRecord } from './core/models/WeightRecord';
 
@@ -22,8 +23,8 @@ import { DisclaimerModal } from './ui/DisclaimerModal';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { GoalStatus } from './ui/GoalStatus';
 import { SleepChart } from './ui/SleepChart';
-import { TutorialWrapper, TutorialTrigger } from './ui/Tutorial.tsx';
-// import { safeParseDate } from './utils/date'; // 【削除】
+import { TutorialWrapper, TutorialTrigger } from './ui/Tutorial';
+import { Achievements } from './ui/Achievements';
 
 import { buttonStyle, cardStyle, inputStyle } from './ui/styles';
 import type { StepType } from '@reactour/tour';
@@ -31,6 +32,7 @@ import type { StepType } from '@reactour/tour';
 const recordManager = new RecordManager();
 const analysisEngine = new AnalysisEngine();
 const reminderManager = new ReminderManager();
+const achievementManager = new AchievementManager();
 
 type Screen = 'main' | 'settings';
 
@@ -89,12 +91,20 @@ function App() {
   const [editingRecord, setEditingRecord] = useState<HealthRecord | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [runTutorial, setRunTutorial] = useState(false);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<Achievement[]>([]);
 
   const updateLocalUI = useCallback(async () => {
     try {
       const latestRecords = await recordManager.getRecords();
       setAllRecords([...latestRecords]);
       setEditingRecord(null);
+
+      const newlyUnlocked = achievementManager.checkAchievements(latestRecords);
+      if (newlyUnlocked.length > 0) {
+        alert(`新しい実績を解除しました: ${newlyUnlocked.map(a => a.title).join(', ')}`);
+      }
+      setUnlockedAchievements(achievementManager.getUnlockedAchievements());
+
     } catch (error) {
       console.error("UIの更新中にエラーが発生しました:", error);
     }
@@ -198,7 +208,6 @@ function App() {
   };
 
   const recordsForSelectedDate = useMemo(() => {
-    // 【修正】インラインで日付形式を変換
     const selectedDate = new Date(currentDate.replace(/-/g, '/'));
     return allRecords.filter(record => {
       const recordDate = new Date(record.date);
@@ -213,6 +222,8 @@ function App() {
       .filter((r): r is WeightRecord => r instanceof WeightRecord)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
   }, [allRecords]);
+
+  const maxDate = new Date().toISOString().split('T')[0];
 
   return (
     <TutorialWrapper steps={tutorialSteps} run={runTutorial} onTutorialFinish={handleTutorialFinish}>
@@ -243,6 +254,8 @@ function App() {
         {currentScreen === 'main' ? (
           <main>
             <GoalStatus user={user} latestWeightRecord={latestWeightRecord} />
+            
+            <Achievements unlockedAchievements={unlockedAchievements} />
 
             <div id="google-fit-step" style={{...cardStyle, marginTop: '24px', marginBottom: '32px' }}>
               {isGoogleAuthEnabled ? (
@@ -285,7 +298,14 @@ function App() {
               <h2 style={{marginTop: 0}}>データ入力</h2>
               <div id="date-picker-step" style={{ textAlign: 'center', marginBottom: '24px' }}>
                 <label htmlFor="current-date-picker" style={{fontWeight: 'bold'}}>表示・記録する日付:</label>
-                <input id="current-date-picker" type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} style={{ ...inputStyle, width: 'auto', marginLeft: '8px' }}/>
+                <input 
+                  id="current-date-picker" 
+                  type="date" 
+                  value={currentDate} 
+                  onChange={e => setCurrentDate(e.target.value)} 
+                  style={{ ...inputStyle, width: 'auto', marginLeft: '8px' }}
+                  max={maxDate}
+                />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
                 <FoodInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} editingRecord={editingRecord} />
