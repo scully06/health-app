@@ -8,6 +8,8 @@ import { AnalysisEngine } from './core/services/AnalysisEngine';
 import { ReminderManager } from './core/services/ReminderManager';
 import { HealthRecord } from './core/models/HealthRecord';
 import { WeightRecord } from './core/models/WeightRecord';
+import { FoodRecord } from './core/models/FoodRecord';
+import { SleepRecord } from './core/models/SleepRecord';
 
 import { AnalysisResult } from './ui/AnalysisResult';
 import { WeightInputForm } from './ui/WeightInputForm';
@@ -30,6 +32,9 @@ const analysisEngine = new AnalysisEngine();
 const reminderManager = new ReminderManager();
 
 type Screen = 'main' | 'settings';
+
+// Google認証が有効かどうかを判定するフラグ
+export const isGoogleAuthEnabled = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function App() {
   const { accessToken, isLoading: isAuthLoading, login, logout } = useAuth();
@@ -117,14 +122,11 @@ function App() {
     }
   };
   
-  // 【追加】インポートデータを処理するハンドラ
   const handleImportData = async (importedRecords: HealthRecord[]) => {
     try {
       await recordManager.overwriteAllRecords(importedRecords);
-      // UIを即時更新
       await updateLocalUI();
       alert('データのインポートが完了しました。');
-      // メイン画面に戻る
       setCurrentScreen('main');
     } catch(error: any) {
       alert(error.message);
@@ -160,12 +162,14 @@ function App() {
                   設定
                 </button>
               )}
-              {accessToken ? (
-                <button onClick={logout} style={{ ...buttonStyle, width: 'auto', marginTop: 0, backgroundColor: '#e74c3c' }}>ログアウト</button>
-              ) : (
-                <button onClick={login} disabled={isAuthLoading} style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}>
-                  {isAuthLoading ? '処理中...' : 'Googleでログイン'}
-                </button>
+              {isGoogleAuthEnabled && (
+                accessToken ? (
+                  <button onClick={logout} style={{ ...buttonStyle, width: 'auto', marginTop: 0, backgroundColor: '#e74c3c' }}>ログアウト</button>
+                ) : (
+                  <button onClick={login} disabled={isAuthLoading} style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}>
+                    {isAuthLoading ? '処理中...' : 'Googleでログイン'}
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -175,15 +179,24 @@ function App() {
           <main>
             <GoalStatus user={user} latestWeightRecord={latestWeightRecord} />
 
-            {accessToken ? (
-              <div style={{...cardStyle, marginTop: '24px', marginBottom: '32px' }}>
-                <h2 style={{marginTop: 0}}>Google Fit データ連携</h2>
-                <WeightDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
-                <SleepDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
-              </div>
+            {isGoogleAuthEnabled ? (
+              accessToken ? (
+                <div style={{...cardStyle, marginTop: '24px', marginBottom: '32px' }}>
+                  <h2 style={{marginTop: 0}}>Google Fit データ連携</h2>
+                  <WeightDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
+                  <SleepDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
+                </div>
+              ) : (
+                <div style={{...cardStyle, marginTop: '24px', marginBottom: '32px', textAlign: 'center' }}>
+                  <p>Googleでログインすると、Google Fitのデータを表示・同期できます。</p>
+                </div>
+              )
             ) : (
-              <div style={{...cardStyle, marginTop: '24px', marginBottom: '32px', textAlign: 'center' }}>
-                <p>Googleでログインすると、Google Fitのデータを表示・同期したり、AI分析の精度を向上させたりできます。</p>
+              <div style={{...cardStyle, marginTop: '24px', marginBottom: '32px', textAlign: 'center', backgroundColor: '#f8f9f9' }}>
+                <p style={{margin: 0, color: '#7f8c8d'}}>
+                  Google連携機能は現在設定されていません。<br/>
+                  利用するには、開発者がアプリケーションにGoogle Client IDを設定する必要があります。
+                </p>
               </div>
             )}
 
@@ -219,7 +232,6 @@ function App() {
             <RecordList records={recordsForSelectedDate} onDeleteRecord={handleDeleteRecord} onEditRecord={handleEditRecord} />
           </main>
         ) : (
-          // 【変更】必要なpropsをSettingsScreenに渡す
           <SettingsScreen 
             user={user} 
             onBack={() => setCurrentScreen('main')}

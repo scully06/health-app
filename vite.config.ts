@@ -5,9 +5,10 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // 【追加】'/'で囲んだリポジトリ名を設定
+  base: '/health-app/', // 'health-app'の部分を実際のリポジトリ名に置き換えてください
   plugins: [react()],
   server: {
-    // バックエンドAPIへのプロキシ設定
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
@@ -15,7 +16,6 @@ export default defineConfig({
       }
     }
   },
-  //【追加】ビルド時に .xlsx ファイルをアセットとして扱う
   build: {
     rollupOptions: {
       output: {
@@ -26,6 +26,6 @@ export default defineConfig({
           return 'assets/[name]-[hash][extname]';
         },
       },
+    },
   },
-},
 })

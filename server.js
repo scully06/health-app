@@ -3,9 +3,8 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { OAuth2Client } from 'google-auth-library';
-import { GoogleGenerativeAI } from '@google/generative-ai'; //【追加】
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import cors from 'cors';
-// .env ファイルから環境変数を読み込む
 dotenv.config();
 
 const app = express();
@@ -14,42 +13,39 @@ app.use(cors({
   origin: 'http://localhost:5173' 
 }));
 
-app.use(express.json());
 const PORT = 3001;
 
-// --- Google OAuth 2.0 クライアントの設定 ---
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-
-if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-  console.error("エラー: .envファイルにGOOGLE_CLIENT_IDまたはGOOGLE_CLIENT_SECRETが設定されていません。");
-  process.exit(1);
-}
-
-const oauth2Client = new OAuth2Client(
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  'postmessage'
-);
-
-// ---【追加】Gemini APIのための設定 ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_API_KEY) {
-  console.error("エラー: .envファイルにGEMINI_API_KEYが設定されていません。");
-  // process.exit(1); // Geminiキーがなくても認証サーバーは動かせるように、一旦コメントアウト
-}
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
+// 【変更】OAuth2ClientとgenAIの初期化を、変数が存在する場合のみ行う
+let oauth2Client;
+if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
+  oauth2Client = new OAuth2Client(
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    'postmessage'
+  );
+}
+
+let genAI;
+let model;
+if (GEMINI_API_KEY) {
+  genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  model = genAI.getGenerativeModel({ model: "gemini-pro" });
+}
 
 //=================================
 // APIルートの定義
 //=================================
 
-/**
- * フロントエンドから受け取った認証コードをアクセストークンに交換するエンドポイント。
- */
 app.post('/api/auth/google', async (req, res) => {
+  // 【変更】環境変数が設定されていない場合、503エラーを返す
+  if (!oauth2Client) {
+    return res.status(503).json({ error: 'Google OAuth is not configured on the server.' });
+  }
+
   const { code } = req.body;
   if (!code) {
     return res.status(400).json({ error: 'Authorization code is required.' });
@@ -64,23 +60,20 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
-/**
- *【追加】Gemini APIに分析を依頼するエンドポイント
- */
 app.post('/api/analyze', async (req, res) => {
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'Gemini APIキーがサーバーに設定されていません。' });
+  // 【変更】環境変数が設定されていない場合、503エラーを返す
+  if (!model) {
+    return res.status(503).json({ error: 'Gemini API is not configured on the server.' });
   }
+
   try {
     const { records } = req.body;
     if (!records || records.length === 0) {
       return res.status(400).json({ error: '分析対象の記録データ(records)が必要です。' });
     }
     
-    // プロンプトを生成
     const prompt = createPromptForGemini(records);
     
-    // Gemini APIにリクエストを送信
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -94,40 +87,16 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-app.get('/api/debug/sleep-sources', async (req, res) => {
-  const accessToken = req.headers.authorization?.split(' ')[1];
-  if (!accessToken) return res.status(401).json({ error: 'Access token is required.' });
-
-  try {
-    oauth2Client.setCredentials({ access_token: accessToken });
-    const fitnessClient = fitness({ version: 'v1', auth: oauth2Client });
-
-    const dataSourcesRes = await fitnessClient.users.dataSources.list({ userId: 'me' });
-    
-    // データタイプが睡眠セグメントのものだけをフィルタリング
-    const sleepDataSources = dataSourcesRes.data.dataSource
-      ?.filter(ds => ds.dataType?.name === 'com.google.sleep.segment');
-
-    res.json(sleepDataSources);
-  } catch (error) {
-    console.error('Failed to list sleep sources:', error.message);
-    res.status(500).json({ error: 'Failed to list sleep sources.' });
-  }
-});
-//=================================
-// ヘルパー関数
-//=================================
-
-/**
- *【追加】Gemini APIに渡すプロンプトを生成する関数
- */
+// ... (その他のAPIルートやヘルパー関数は変更なし)
+// ... createPromptForGeminiなど ...
 function createPromptForGemini(records) {
   const recordsText = records.map(r => {
     let detail = '';
     if (r.weight) {
       detail = `体重: ${r.weight}kg`;
-    } else if (r.sleepTime) {
-      detail = `睡眠: ${r.sleepTime.toFixed(1)}h, 質: ${r.quality}`;
+    } else if (r.stageDurations) { // sleepTimeからstageDurationsに変更
+      const totalHours = Object.values(r.stageDurations).reduce((sum, current) => sum + (current || 0), 0) / 60;
+      detail = `睡眠: ${totalHours.toFixed(1)}h`;
     } else if (r.mealType) {
       detail = `食事(${r.mealType}): ${r.description} (${r.calories}kcal)`;
     }
@@ -149,9 +118,6 @@ function createPromptForGemini(records) {
 }
 
 
-//=================================
-// サーバー起動
-//=================================
 app.listen(PORT, () => {
   console.log(`Authentication and Analysis server is running on http://localhost:${PORT}`);
 });

@@ -33,7 +33,7 @@ export const GoalStatus: React.FC<GoalStatusProps> = ({ user, latestWeightRecord
       return <p style={{ margin: 0, fontWeight: 'bold', color: '#27ae60' }}>🎉 目標体重達成！おめでとうございます！</p>;
     }
 
-    const diffText = diff > 0 ? `${diff.toFixed(1)}kg 増やす` : `${Math.abs(diff).toFixed(1)}kg 減らす`;
+    diff > 0 ? `${diff.toFixed(1)}kg 増やす` : `${Math.abs(diff).toFixed(1)}kg 減らす`;
     return (
       <p style={{ margin: 0, fontWeight: 'bold', color: '#16a085' }}>
         目標体重まであと <span style={{ fontSize: '1.2em' }}>{Math.abs(diff).toFixed(1)}</span> kg

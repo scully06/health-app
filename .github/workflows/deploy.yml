@@ -1,0 +1,47 @@
+# GitHub Pagesへのデプロイ用ワークフロー
+
+name: Deploy to GitHub Pages
+
+# mainブランチにプッシュされた時にワークフローを実行
+on:
+  push:
+    branches:
+      - main
+
+# ワークフローがリポジトリに書き込む権限を設定
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # 最新のUbuntu環境で実行
+    steps:
+      # 1. リポジトリのコードをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Node.js環境をセットアップ
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # プロジェクトで使用するNode.jsのバージョン
+          cache: 'npm'
+
+      # 3. 依存関係をインストール
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. アプリケーションをビルド
+      # GitHubのシークレットから環境変数を読み込んでビルドを実行
+      - name: Build
+        run: npm run build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+
+      # 5. GitHub Pagesにデプロイ
+      # ビルド成果物（distディレクトリ）をgh-pagesブランチにプッシュ
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist

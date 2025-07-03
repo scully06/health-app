@@ -1,5 +1,8 @@
+// src/hooks/useAuth.ts
 import { useState, useEffect, useCallback } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
+// 【追加】App.tsxからフラグをインポート
+import { isGoogleAuthEnabled } from '../App';
 
 interface AuthState {
   accessToken: string | null;
@@ -8,40 +11,58 @@ interface AuthState {
   logout: () => void;
 }
 
+// 【追加】Google認証が無効な場合に返すダミーの（空の）状態
+const disabledAuthState: AuthState = {
+  accessToken: null,
+  isLoading: false,
+  login: () => console.warn('Google Auth is not configured.'),
+  logout: () => {},
+};
+
 export const useAuth = (): AuthState => {
+  // 【最重要】Google認証が無効な場合は、ここで処理を中断し、ダミーの値を返す
+  if (!isGoogleAuthEnabled) {
+    return disabledAuthState;
+  }
+
+  // --- 以下は、Google認証が有効な場合のみ実行される ---
+
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchAccessToken = useCallback(async (code: string) => {
     setIsLoading(true);
     try {
-      // バックエンドサーバー(server.js)のエンドポイントを呼び出す
       const response = await fetch('http://localhost:3001/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),
       });
-      if (!response.ok) {
-        throw new Error('バックエンドからのアクセストークン取得に失敗しました。');
-      }
+      
       const data = await response.json();
+
+      if (!response.ok) {
+        console.error('バックエンドからのトークン取得に失敗しました。', data);
+        throw new Error(data.error || 'Failed to fetch access token from backend.');
+      }
+
       const token = data.access_token;
       setAccessToken(token);
-      localStorage.setItem('accessToken', token); // トークンをローカルストレージに保存
+      localStorage.setItem('accessToken', token);
     } catch (error) {
       console.error(error);
-      setAccessToken(null); // エラー時はトークンをクリア
+      setAccessToken(null);
       localStorage.removeItem('accessToken');
     } finally {
       setIsLoading(false);
     }
   }, []);
   
+  // このフックは isGoogleAuthEnabled が true の場合のみ呼び出される
   const login = useGoogleLogin({
     onSuccess: (codeResponse) => fetchAccessToken(codeResponse.code),
     onError: error => console.error('Googleログインに失敗:', error),
-    flow: 'auth-code', // サーバーサイドでトークンを扱うため 'auth-code' フローが必須
-    //【重要】scopeプロパティを修正。睡眠データ読み取り権限を追加
+    flow: 'auth-code',
     scope: 'https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.body.read',
   });
 
@@ -51,7 +72,6 @@ export const useAuth = (): AuthState => {
     console.log('ログアウトしました。');
   };
 
-  // アプリ起動時にローカルストレージからトークンを読み込む
   useEffect(() => {
     const storedToken = localStorage.getItem('accessToken');
     if (storedToken) {
