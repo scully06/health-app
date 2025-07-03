@@ -42,3 +42,40 @@ graph TD
     style cloud_server fill:#f1f8e9,stroke:#333,stroke-width:2px
     style external_services fill:#fff9c4,stroke:#333,stroke-width:1px
 ```
+```mermaid
+sequenceDiagram
+    actor User
+    participant WF as WeightInputForm
+    participant App as App.tsx
+    participant RM as RecordManager
+    participant AE as AnalysisEngine
+    participant Server as server.js
+    participant Gemini as Gemini API
+
+    %% 1. ユーザーが体重を入力・保存
+    User->>+WF: 体重を入力し「保存する」をクリック
+    WF->>+RM: saveRecord(newRecord)
+    note right of RM: 体重データをlocalStorageに保存
+    RM-->>-WF: 保存完了
+    WF->>App: onRecordSaved() を呼び出し
+
+    %% 2. AppコンポーネントがUI更新と分析をトリガー
+    activate App
+    App->>+RM: getRecords()
+    RM-->>-App: 更新された全記録リスト
+    App->>+AE: analyze(全記録リスト)
+
+    %% 3. 分析エンジンがバックエンドに分析を依頼
+    AE->>+Server: POST /api/analyze
+    note left of Server: 記録データから<br>プロンプトを生成
+    Server->>+Gemini: generateContent(prompt)
+    Gemini-->>-Server: AIによる分析結果テキスト
+    Server-->>-AE: { analysisText: "..." }
+    AE-->>-App: 分析結果テキスト
+
+    %% 4. AppコンポーネントがStateを更新し、UIが再描画される
+    App->>App: setState(records, analysisResult)
+    deactivate App
+    
+    WF-->>-User: BMIと保存完了メッセージを表示
+```
