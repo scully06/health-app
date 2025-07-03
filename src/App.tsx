@@ -22,8 +22,11 @@ import { DisclaimerModal } from './ui/DisclaimerModal';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { GoalStatus } from './ui/GoalStatus';
 import { SleepChart } from './ui/SleepChart';
+import { TutorialWrapper, TutorialTrigger } from './ui/Tutorial.tsx';
+// import { safeParseDate } from './utils/date'; // 【削除】
 
 import { buttonStyle, cardStyle, inputStyle } from './ui/styles';
+import type { StepType } from '@reactour/tour';
 
 const recordManager = new RecordManager();
 const analysisEngine = new AnalysisEngine();
@@ -32,6 +35,34 @@ const reminderManager = new ReminderManager();
 type Screen = 'main' | 'settings';
 
 export const isGoogleAuthEnabled = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+const tutorialSteps: StepType[] = [
+  {
+    selector: 'body',
+    content: 'ようこそ！健康管理アプリの基本的な使い方をご案内します。',
+  },
+  {
+    selector: '#date-picker-step',
+    content: 'ここで日付を選択します。過去の記録を見たり、未来の予定を入力したりできます。',
+  },
+  {
+    selector: '#data-input-section',
+    content: '食事、体重、睡眠など、日々の健康データをここから入力します。',
+  },
+  {
+    selector: '#ai-analysis-step',
+    content: '記録が溜まったら、このボタンを押してAIによる健康アドバイスを受け取ってみましょう。',
+  },
+  {
+    selector: '#google-fit-step',
+    content: 'Googleアカウントでログインすると、Google Fitに記録された体重や睡眠データを自動で同期できます。',
+  },
+  {
+    selector: '#settings-button-step',
+    content: '身長や目標体重の変更、データのエクスポートなどはここから行えます。',
+  },
+];
+
 
 function App() {
   const { accessToken, isLoading: isAuthLoading, login, logout } = useAuth();
@@ -51,25 +82,41 @@ function App() {
   });
   
   const [allRecords, setAllRecords] = useState<HealthRecord[]>([]);
-  const [analysisResult, setAnalysisResult] = useState<string>('');
+  const [analysisResult, setAnalysisResult] = useState<string>('下のボタンを押して、AI分析を開始してください。');
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<Screen>('main');
   const [editingRecord, setEditingRecord] = useState<HealthRecord | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [runTutorial, setRunTutorial] = useState(false);
 
   const updateLocalUI = useCallback(async () => {
     try {
-      // 【修正】getRecordsの呼び出しから引数を削除
       const latestRecords = await recordManager.getRecords();
       setAllRecords([...latestRecords]);
-      const resultText = await analysisEngine.analyze(latestRecords);
-      setAnalysisResult(resultText);
       setEditingRecord(null);
     } catch (error) {
       console.error("UIの更新中にエラーが発生しました:", error);
-      setAnalysisResult("データの処理中にエラーが発生しました。");
     }
-  }, []); // 【修正】user.idへの依存がなくなったため、依存配列を空にする
+  }, []);
+
+  const handleRequestAnalysis = useCallback(async () => {
+    if (allRecords.length < 3) {
+      alert('分析するには、3件以上の記録が必要です。');
+      return;
+    }
+    setIsAnalyzing(true);
+    setAnalysisResult("AIが分析中です...");
+    try {
+        const resultText = await analysisEngine.analyze(allRecords);
+        setAnalysisResult(resultText);
+    } catch (error) {
+        console.error("AI分析リクエスト中にエラーが発生しました:", error);
+        setAnalysisResult("AI分析中にエラーが発生しました。");
+    } finally {
+        setIsAnalyzing(false);
+    }
+  }, [allRecords]);
 
   useEffect(() => {
     updateLocalUI();
@@ -79,12 +126,26 @@ function App() {
     const disclaimerDismissed = localStorage.getItem('disclaimerDismissed');
     if (!disclaimerDismissed) {
       setIsDisclaimerOpen(true);
+    } else {
+      const tutorialCompleted = localStorage.getItem('tutorialCompleted');
+      if (!tutorialCompleted) {
+        setTimeout(() => setRunTutorial(true), 500);
+      }
     }
   }, []);
 
   const handleCloseDisclaimer = () => {
     localStorage.setItem('disclaimerDismissed', 'true');
     setIsDisclaimerOpen(false);
+    const tutorialCompleted = localStorage.getItem('tutorialCompleted');
+    if (!tutorialCompleted) {
+        setTimeout(() => setRunTutorial(true), 500);
+    }
+  };
+
+  const handleTutorialFinish = () => {
+    setRunTutorial(false);
+    localStorage.setItem('tutorialCompleted', 'true');
   };
   
   const handleDeleteRecord = async (recordId: string) => {
@@ -137,7 +198,8 @@ function App() {
   };
 
   const recordsForSelectedDate = useMemo(() => {
-    const selectedDate = new Date(currentDate);
+    // 【修正】インラインで日付形式を変換
+    const selectedDate = new Date(currentDate.replace(/-/g, '/'));
     return allRecords.filter(record => {
       const recordDate = new Date(record.date);
       return recordDate.getFullYear() === selectedDate.getFullYear() &&
@@ -153,15 +215,15 @@ function App() {
   }, [allRecords]);
 
   return (
-    <>
+    <TutorialWrapper steps={tutorialSteps} run={runTutorial} onTutorialFinish={handleTutorialFinish}>
       <DisclaimerModal isOpen={isDisclaimerOpen} onClose={handleCloseDisclaimer} />
-      <div className="App" style={{ maxWidth: '960px', margin: '40px auto', padding: '20px', fontFamily: 'sans-serif' }}>
+      <div className="App" style={{ maxWidth: '960px', margin: '0 auto', padding: '1rem', fontFamily: 'sans-serif' }}>
         <header style={{ borderBottom: '1px solid #ddd', paddingBottom: '20px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-            <h1 style={{ color: '#2c3e50', margin: 0 }}>健康管理アプリ</h1>
+            <h1 style={{ color: '#2c3e50', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>健康管理アプリ</h1>
             <div>
               {currentScreen === 'main' && (
-                <button onClick={() => setCurrentScreen('settings')} style={{ ...buttonStyle, width: 'auto', marginTop: 0, marginRight: '12px', backgroundColor: '#95a5a6' }}>
+                <button id="settings-button-step" onClick={() => setCurrentScreen('settings')} style={{ ...buttonStyle, width: 'auto', marginTop: 0, marginRight: '12px', backgroundColor: '#95a5a6' }}>
                   設定
                 </button>
               )}
@@ -182,38 +244,46 @@ function App() {
           <main>
             <GoalStatus user={user} latestWeightRecord={latestWeightRecord} />
 
-            {isGoogleAuthEnabled ? (
-              accessToken ? (
-                <div style={{...cardStyle, marginTop: '24px', marginBottom: '32px' }}>
-                  <h2 style={{marginTop: 0}}>Google Fit データ連携</h2>
-                  <WeightDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
-                  <SleepDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
-                </div>
+            <div id="google-fit-step" style={{...cardStyle, marginTop: '24px', marginBottom: '32px' }}>
+              {isGoogleAuthEnabled ? (
+                accessToken ? (
+                  <>
+                    <h2 style={{marginTop: 0}}>Google Fit データ連携</h2>
+                    <WeightDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
+                    <SleepDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
+                  </>
+                ) : (
+                  <div style={{textAlign: 'center' }}>
+                    <p>Googleでログインすると、Google Fitのデータを表示・同期できます。</p>
+                  </div>
+                )
               ) : (
-                <div style={{...cardStyle, marginTop: '24px', marginBottom: '32px', textAlign: 'center' }}>
-                  <p>Googleでログインすると、Google Fitのデータを表示・同期できます。</p>
+                <div style={{textAlign: 'center', backgroundColor: '#f8f9f9' }}>
+                  <p style={{margin: 0, color: '#7f8c8d'}}>
+                    Google連携機能は現在設定されていません。<br/>
+                    利用するには、開発者がアプリケーションにGoogle Client IDを設定する必要があります。
+                  </p>
                 </div>
-              )
-            ) : (
-              <div style={{...cardStyle, marginTop: '24px', marginBottom: '32px', textAlign: 'center', backgroundColor: '#f8f9f9' }}>
-                <p style={{margin: 0, color: '#7f8c8d'}}>
-                  Google連携機能は現在設定されていません。<br/>
-                  利用するには、開発者がアプリケーションにGoogle Client IDを設定する必要があります。
-                </p>
-              </div>
-            )}
+              )}
+            </div>
 
             <div style={{ ...cardStyle, marginBottom: '32px' }}>
               <h2 style={{marginTop: 0}}>分析と設定</h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-                <AnalysisResult analysisText={analysisResult} />
+                <div id="ai-analysis-step">
+                    <AnalysisResult 
+                      analysisText={analysisResult} 
+                      onAnalyzeClick={handleRequestAnalysis}
+                      isAnalyzing={isAnalyzing}
+                    />
+                </div>
                 <ReminderSettings reminderManager={reminderManager} />
               </div>
             </div>
             
             <div id="data-input-section" style={{ ...cardStyle }}>
               <h2 style={{marginTop: 0}}>データ入力</h2>
-              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div id="date-picker-step" style={{ textAlign: 'center', marginBottom: '24px' }}>
                 <label htmlFor="current-date-picker" style={{fontWeight: 'bold'}}>表示・記録する日付:</label>
                 <input id="current-date-picker" type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} style={{ ...inputStyle, width: 'auto', marginLeft: '8px' }}/>
               </div>
@@ -233,6 +303,10 @@ function App() {
             </div>
 
             <RecordList records={recordsForSelectedDate} onDeleteRecord={handleDeleteRecord} onEditRecord={handleEditRecord} />
+            
+            <div style={{textAlign: 'center', marginTop: '2rem'}}>
+                <TutorialTrigger />
+            </div>
           </main>
         ) : (
           <SettingsScreen 
@@ -244,7 +318,7 @@ function App() {
           />
         )}
       </div>
-    </>
+    </TutorialWrapper>
   );
 }
 
