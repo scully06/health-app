@@ -18,6 +18,7 @@ import { RecordList } from './ui/RecordList';
 import { ReminderSettings } from './ui/ReminderSettings';
 import { WeightDataDisplay } from './ui/WeightDataDisplay';
 import { SleepDataDisplay } from './ui/SleepDataDisplay';
+import { DisclaimerModal } from './ui/DisclaimerModal';
 
 import { buttonStyle, cardStyle, inputStyle } from './ui/styles';
 
@@ -32,6 +33,7 @@ function App() {
   const [allRecords, setAllRecords] = useState<HealthRecord[]>([]);
   const [analysisResult, setAnalysisResult] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
 
   const updateLocalUI = useCallback(async () => {
     const latestRecords = await recordManager.getRecords(user.id);
@@ -45,7 +47,18 @@ function App() {
     updateLocalUI();
   }, [updateLocalUI]);
   
-  //【追加】レコード削除のハンドラ関数
+  useEffect(() => {
+    const disclaimerDismissed = localStorage.getItem('disclaimerDismissed');
+    if (!disclaimerDismissed) {
+      setIsDisclaimerOpen(true);
+    }
+  }, []);
+
+  const handleCloseDisclaimer = () => {
+    setIsDisclaimerOpen(false);
+    localStorage.setItem('disclaimerDismissed', 'true');
+  };
+  
   const handleDeleteRecord = async (recordId: string) => {
     await recordManager.deleteRecord(recordId);
     await updateLocalUI();
@@ -63,64 +76,66 @@ function App() {
   }, [allRecords, currentDate]);
 
   return (
-    <div className="App" style={{ maxWidth: '960px', margin: '40px auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      <header style={{ borderBottom: '1px solid #ddd', paddingBottom: '20px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <h1 style={{ color: '#2c3e50', margin: 0 }}>健康管理アプリ</h1>
-          <div>
-            {accessToken ? (
-              <button onClick={logout} style={{ ...buttonStyle, width: 'auto', marginTop: 0, backgroundColor: '#e74c3c' }}>ログアウト</button>
-            ) : (
-              <button onClick={login} disabled={isAuthLoading} style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}>
-                {isAuthLoading ? '処理中...' : 'Googleでログイン'}
-              </button>
-            )}
+    <>
+      <DisclaimerModal isOpen={isDisclaimerOpen} onClose={handleCloseDisclaimer} />
+      <div className="App" style={{ maxWidth: '960px', margin: '40px auto', padding: '20px', fontFamily: 'sans-serif' }}>
+        <header style={{ borderBottom: '1px solid #ddd', paddingBottom: '20px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <h1 style={{ color: '#2c3e50', margin: 0 }}>健康管理アプリ</h1>
+            <div>
+              {accessToken ? (
+                <button onClick={logout} style={{ ...buttonStyle, width: 'auto', marginTop: 0, backgroundColor: '#e74c3c' }}>ログアウト</button>
+              ) : (
+                <button onClick={login} disabled={isAuthLoading} style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}>
+                  {isAuthLoading ? '処理中...' : 'Googleでログイン'}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
-      
-      <main>
-        {accessToken ? (
-          <div style={{...cardStyle, marginBottom: '32px' }}>
-            <h2 style={{marginTop: 0}}>Google Fit データ連携</h2>
-            <WeightDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
-            <SleepDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
-          </div>
-        ) : (
-          <div style={{...cardStyle, marginBottom: '32px', textAlign: 'center' }}>
-            <p>Googleでログインすると、Google Fitのデータを表示・同期したり、AI分析の精度を向上させたりできます。</p>
-          </div>
-        )}
-
-        <div style={{ ...cardStyle, marginBottom: '32px' }}>
-          <h2 style={{marginTop: 0}}>分析と設定</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-            <AnalysisResult analysisText={analysisResult} />
-            <ReminderSettings reminderManager={reminderManager} />
-          </div>
-        </div>
+        </header>
         
-        <div style={{ ...cardStyle }}>
-          <h2 style={{marginTop: 0}}>データ入力</h2>
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <label htmlFor="current-date-picker" style={{fontWeight: 'bold'}}>表示・記録する日付:</label>
-            <input id="current-date-picker" type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} style={{ ...inputStyle, width: 'auto', marginLeft: '8px' }}/>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-            <FoodInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} />
-            <WeightInputForm user={user} recordManager={recordManager} analysisEngine={analysisEngine} onRecordSaved={updateLocalUI} currentDate={currentDate} />
-            <SleepInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} />
-          </div>
-        </div>
+        <main>
+          {accessToken ? (
+            <div style={{...cardStyle, marginBottom: '32px' }}>
+              <h2 style={{marginTop: 0}}>Google Fit データ連携</h2>
+              <WeightDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
+              <SleepDataDisplay accessToken={accessToken} recordManager={recordManager} onSync={updateLocalUI} />
+            </div>
+          ) : (
+            <div style={{...cardStyle, marginBottom: '32px', textAlign: 'center' }}>
+              <p>Googleでログインすると、Google Fitのデータを表示・同期したり、AI分析の精度を向上させたりできます。</p>
+            </div>
+          )}
 
-        <div style={{ marginTop: '32px' }}>
-          <WeightChart records={allRecords} />
-        </div>
+          <div style={{ ...cardStyle, marginBottom: '32px' }}>
+            <h2 style={{marginTop: 0}}>分析と設定</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+              <AnalysisResult analysisText={analysisResult} />
+              <ReminderSettings reminderManager={reminderManager} />
+            </div>
+          </div>
+          
+          <div style={{ ...cardStyle }}>
+            <h2 style={{marginTop: 0}}>データ入力</h2>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <label htmlFor="current-date-picker" style={{fontWeight: 'bold'}}>表示・記録する日付:</label>
+              <input id="current-date-picker" type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} style={{ ...inputStyle, width: 'auto', marginLeft: '8px' }}/>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+              <FoodInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} />
+              <WeightInputForm user={user} recordManager={recordManager} analysisEngine={analysisEngine} onRecordSaved={updateLocalUI} currentDate={currentDate} />
+              <SleepInputForm user={user} recordManager={recordManager} onRecordSaved={updateLocalUI} currentDate={currentDate} />
+            </div>
+          </div>
 
-        {/*【追加】onDeleteRecordプロパティをRecordListに渡す */}
-        <RecordList records={recordsForSelectedDate} onDeleteRecord={handleDeleteRecord} />
-      </main>
-    </div>
+          <div style={{ marginTop: '32px' }}>
+            <WeightChart records={allRecords} />
+          </div>
+
+          <RecordList records={recordsForSelectedDate} onDeleteRecord={handleDeleteRecord} />
+        </main>
+      </div>
+    </>
   );
 }
 
