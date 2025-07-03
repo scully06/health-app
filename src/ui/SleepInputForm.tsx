@@ -34,12 +34,14 @@ export const SleepInputForm: React.FC<SleepInputFormProps> = ({ user, recordMana
       setUnit('minutes');
       setFeedback('記録を編集中...');
     } else {
-      setDeep('');
-      setLight('');
-      setRem('');
-      setAwake('');
       setIsEditing(false);
-      setFeedback('');
+      if (!editingRecord) {
+          setDeep('');
+          setLight('');
+          setRem('');
+          setAwake('');
+          setFeedback('');
+      }
     }
   }, [editingRecord]);
 
@@ -65,9 +67,10 @@ export const SleepInputForm: React.FC<SleepInputFormProps> = ({ user, recordMana
       deep: deepMinutes, light: lightMinutes, rem: remMinutes, awake: awakeMinutes,
     };
 
-    // 【変更】編集中は既存のIDを、新規作成時はタイムスタンプベースの一意なIDを生成
     const recordId = isEditing && editingRecord ? editingRecord.id : `manual-sleep-${Date.now()}`;
-    const newRecord = new SleepRecord(recordId, user.id, new Date(currentDate), stageDurations);
+    // 【修正】Safari対応
+    const recordDate = new Date(currentDate.replace(/-/g, '/'));
+    const newRecord = new SleepRecord(recordId, user.id, recordDate, stageDurations);
     
     try {
       await recordManager.saveRecord(newRecord);

@@ -39,16 +39,17 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
       setMealType(editingRecord.mealType);
       setDescription(editingRecord.description);
       setCalories(editingRecord.calories.toString());
-      setGrams('100'); //グラムはリセット
-      setCaloriesPer100g(null); // 自動計算はオフ
+      setGrams('100');
+      setCaloriesPer100g(null);
       setSearchTerm('');
       setSearchResults([]);
       setIsEditing(true);
     } else {
-      // 編集モードが解除されたらフォームをリセット
       setIsEditing(false);
-      setDescription('');
-      setCalories('');
+      if (!editingRecord) { // 他のフォーム編集中はリセットしない
+          setDescription('');
+          setCalories('');
+      }
     }
   }, [editingRecord]);
 
@@ -104,7 +105,8 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     const newRecord = new FoodRecord(
       recordId,
       user.id,
-      new Date(currentDate),
+      // 【修正】Safari対応
+      new Date(currentDate.replace(/-/g, '/')),
       mealType,
       description.trim(),
       caloriesValue

@@ -27,9 +27,11 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
       setIsEditing(true);
       setFeedbackMessage('記録を編集中...');
     } else {
-      setWeight('');
       setIsEditing(false);
-      setFeedbackMessage('');
+      if (!editingRecord) {
+          setWeight('');
+          setFeedbackMessage('');
+      }
     }
   }, [editingRecord]);
 
@@ -41,7 +43,9 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
     }
 
     const recordId = isEditing && editingRecord ? editingRecord.id : `manual-weight-${new Date(currentDate).toISOString().split('T')[0]}`;
-    const newRecord = new WeightRecord(recordId, user.id, new Date(currentDate), weightValue);
+    // 【修正】Safari対応
+    const recordDate = new Date(currentDate.replace(/-/g, '/'));
+    const newRecord = new WeightRecord(recordId, user.id, recordDate, weightValue);
 
     try {
       await recordManager.saveRecord(newRecord);

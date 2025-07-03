@@ -9,11 +9,23 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   
-  /*【追加】全体の背景色 */
+  /* 全体の背景色 */
   background-color: #f4f7f6;
 }
 
-/*【追加】ボックスサイズの計算方法を統一 */
+/* ボックスサイズの計算方法を統一 */
 *, *::before, *::after {
   box-sizing: border-box;
+}
+
+/* 【追加】Appコンポーネントのpaddingを画面幅に応じて調整 */
+#root .App {
+  padding: 1rem; /* スマホなどの狭い画面用のデフォルトpadding */
+}
+
+@media (min-width: 640px) {
+  /* 画面幅が640px以上の場合、paddingを大きくする */
+  #root .App {
+    padding: 2rem;
+  }
 }
