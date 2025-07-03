@@ -27,9 +27,8 @@ jobs:
           node-version: '20' # プロジェクトで使用するNode.jsのバージョン
           cache: 'npm'
 
-      # 3. 依存関係をインストール
+      # 3. 依存関係をクリーンインストール
       - name: Install dependencies
-        # 【変更】npm install から npm ci に変更
         run: npm ci
 
       # 4. アプリケーションをビルド
@@ -37,9 +36,8 @@ jobs:
         run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-        
+
       # 5. GitHub Pagesにデプロイ
-      # ビルド成果物（distディレクトリ）をgh-pagesブランチにプッシュ
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
