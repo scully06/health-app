@@ -20,28 +20,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Node.js環境をセットアップ
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20' # プロジェクトで使用するNode.jsのバージョン
-
-      # 3. pnpmをセットアップし、依存関係をインストール
-      - name: Setup pnpm and Install dependencies
+      # 2. pnpmをセットアップ
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
-          # 【変更】このアクション内でインストールを実行する
-          run_install: true
 
-      # 4. アプリケーションをビルド
+      # 3. Node.js環境をセットアップ
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm' # キャッシュをpnpm用に設定
+
+      # 4. 依存関係をインストール
+      - name: Install dependencies
+        run: pnpm install
+
+      # 5. アプリケーションをビルド
       - name: Build
-        # pnpm run build を実行
         run: pnpm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
 
-      # 5. GitHub Pagesにデプロイ
+      # 6. GitHub Pagesにデプロイ
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
