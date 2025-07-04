@@ -1,4 +1,4 @@
-# GitHub Pagesへのデプロイ用ワークフロー (pnpm版)
+# GitHub Pagesへのデプロイ用ワークフロー (npm版)
 
 name: Deploy to GitHub Pages
 
@@ -20,30 +20,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. pnpmをセットアップ
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      # 3. Node.js環境をセットアップ
+      # 2. Node.js環境をセットアップ
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm' # キャッシュをpnpm用に設定
+          cache: 'npm' # キャッシュをnpm用に設定
 
-      # 4. 依存関係をインストール
+      # 3. 依存関係をクリーンインストール
       - name: Install dependencies
-        run: pnpm install
+        run: npm ci
 
-      # 5. アプリケーションをビルド
+      # 4. アプリケーションをビルド
       - name: Build
-        run: pnpm run build
+        run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
 
-      # 6. GitHub Pagesにデプロイ
+      # 5. GitHub Pagesにデプロイ
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
