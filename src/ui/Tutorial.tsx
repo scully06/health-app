@@ -4,8 +4,8 @@ import { TourProvider, useTour } from '@reactour/tour';
 import type { StepType } from '@reactour/tour';
 
 // ツアーの実行を制御する内部コンポーネント
-const TourController: React.FC<{ run: boolean; onFinish: () => void }> = ({ run, onFinish }) => {
-  const { setIsOpen, isOpen, setSteps } = useTour();
+const TourController: React.FC<{ run: boolean; onFinish: () => void }> = ({ run}) => {
+  const { setIsOpen, isOpen} = useTour();
 
   // runプロパティがtrueになったらツアーを開始する
   useEffect(() => {
