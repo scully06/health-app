@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { useAuth } from './hooks/useAuth';
 import { User } from './core/models/User';
@@ -25,6 +25,8 @@ import { GoalStatus } from './ui/GoalStatus';
 import { SleepChart } from './ui/SleepChart';
 import { TutorialWrapper, TutorialTrigger } from './ui/Tutorial';
 import { Achievements } from './ui/Achievements';
+import { ShareableRecord } from './ui/ShareableRecord';
+import html2canvas from 'html2canvas';
 
 import { buttonStyle, cardStyle, inputStyle } from './ui/styles';
 import type { StepType } from '@reactour/tour';
@@ -93,6 +95,9 @@ function App() {
   const [runTutorial, setRunTutorial] = useState(false);
   const [unlockedAchievements, setUnlockedAchievements] = useState<Achievement[]>([]);
 
+  const [shareData, setShareData] = useState<{ records: HealthRecord[]; date: string } | null>(null);
+  const shareableRef = useRef<HTMLDivElement>(null);
+
   const updateLocalUI = useCallback(async () => {
     try {
       const latestRecords = await recordManager.getRecords();
@@ -147,9 +152,10 @@ function App() {
   const handleCloseDisclaimer = () => {
     localStorage.setItem('disclaimerDismissed', 'true');
     setIsDisclaimerOpen(false);
+    
     const tutorialCompleted = localStorage.getItem('tutorialCompleted');
     if (!tutorialCompleted) {
-        setTimeout(() => setRunTutorial(true), 500);
+        setTimeout(() => setRunTutorial(true), 300);
     }
   };
 
@@ -223,10 +229,69 @@ function App() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
   }, [allRecords]);
 
+  const handleShareDay = () => {
+    if (recordsForSelectedDate.length > 0) {
+      setShareData({ records: recordsForSelectedDate, date: currentDate });
+    } else {
+      alert('共有する記録がありません。');
+    }
+  };
+
+  useEffect(() => {
+    if (shareData && shareableRef.current) {
+      const shareImage = async () => {
+        const element = shareableRef.current!;
+        try {
+          const canvas = await html2canvas(element, {
+            backgroundColor: null,
+            scale: 2,
+          });
+          canvas.toBlob(async (blob) => {
+            if (blob) {
+              const fileName = `health-summary-${shareData.date}.png`;
+              const file = new File([blob], fileName, { type: 'image/png' });
+
+              if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                  title: '今日の健康記録',
+                  text: `${shareData.date}の健康記録を共有します！`,
+                  files: [file],
+                });
+              } else {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                link.click();
+                URL.revokeObjectURL(link.href);
+              }
+            }
+          }, 'image/png');
+        } catch (error) {
+          console.error('画像の生成または共有に失敗しました。', error);
+          alert('画像の共有に失敗しました。');
+        } finally {
+          setShareData(null);
+        }
+      };
+      setTimeout(shareImage, 100);
+    }
+  }, [shareData, user.name]);
+
   const maxDate = new Date().toISOString().split('T')[0];
 
   return (
     <TutorialWrapper steps={tutorialSteps} run={runTutorial} onTutorialFinish={handleTutorialFinish}>
+      {shareData && (
+        <div style={{ position: 'fixed', left: '-9999px', top: '-9999px' }}>
+          <div ref={shareableRef}>
+            <ShareableRecord
+              records={shareData.records}
+              date={shareData.date}
+              userName={user.name}
+            />
+          </div>
+        </div>
+      )}
       <DisclaimerModal isOpen={isDisclaimerOpen} onClose={handleCloseDisclaimer} />
       <div className="App" style={{ maxWidth: '960px', margin: '0 auto', padding: '1rem', fontFamily: 'sans-serif' }}>
         <header style={{ borderBottom: '1px solid #ddd', paddingBottom: '20px', marginBottom: '20px' }}>
@@ -322,7 +387,12 @@ function App() {
               <SleepChart records={allRecords} />
             </div>
 
-            <RecordList records={recordsForSelectedDate} onDeleteRecord={handleDeleteRecord} onEditRecord={handleEditRecord} />
+            <RecordList 
+              records={recordsForSelectedDate} 
+              onDeleteRecord={handleDeleteRecord} 
+              onEditRecord={handleEditRecord} 
+              onShareDay={handleShareDay}
+            />
             
             <div style={{textAlign: 'center', marginTop: '2rem'}}>
                 <TutorialTrigger />

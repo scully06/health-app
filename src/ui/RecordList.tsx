@@ -4,14 +4,13 @@ import { HealthRecord } from '../core/models/HealthRecord';
 import { WeightRecord } from '../core/models/WeightRecord';
 import { SleepRecord, type SleepStageDurations } from '../core/models/SleepRecord';
 import { FoodRecord } from '../core/models/FoodRecord';
-import { cardStyle } from './styles';
+import { cardStyle, buttonStyle } from './styles';
 
-// 【重要】ここの型定義を修正します
 interface RecordListProps {
   records: HealthRecord[];
   onDeleteRecord: (recordId: string) => void;
-  // 'onEditRecord'プロパティを追加
   onEditRecord: (record: HealthRecord) => void;
+  onShareDay: () => void;
 }
 
 const formatSleepDetails = (durations: SleepStageDurations): string => {
@@ -28,8 +27,7 @@ const formatSleepDetails = (durations: SleepStageDurations): string => {
   return `合計 ${totalHours}時間 (${details})`;
 };
 
-// 【重要】コンポーネントの引数に onEditRecord を追加します
-export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord, onEditRecord }) => {
+export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord, onEditRecord, onShareDay }) => {
   const sortedRecords = [...records].sort((a, b) => {
     const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
     if (dateDiff !== 0) return dateDiff;
@@ -48,9 +46,17 @@ export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord,
 
   return (
     <div style={{...cardStyle, marginTop: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ marginTop: 0, color: '#2c3e50' }}>選択日の記録</h3>
-        {totalCalories > 0 && <strong style={{ color: '#e67e22' }}>合計: {totalCalories} kcal</strong>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+        <h3 style={{ marginTop: 0, color: '#2c3e50', marginBottom: 0 }}>選択日の記録</h3>
+        <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+          {totalCalories > 0 && <strong style={{ color: '#e67e22' }}>合計: {totalCalories} kcal</strong>}
+          {/* 【確認】この共有ボタンは、選択された日に記録が1件以上ある場合のみ表示されます */}
+          {records.length > 0 && (
+            <button onClick={onShareDay} style={{...buttonStyle, width: 'auto', padding: '5px 12px', fontSize: '14px', marginTop: 0, backgroundColor: '#1abc9c'}}>
+              この日を共有
+            </button>
+          )}
+        </div>
       </div>
       {sortedRecords.length === 0 ? (
         <p style={{ color: '#7f8c8d' }}>記録はまだありません。</p>
@@ -66,7 +72,6 @@ export const RecordList: React.FC<RecordListProps> = ({ records, onDeleteRecord,
               <li key={record.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', padding: '12px 0' }}>
                 <span style={{ color: '#34495e' }}>{content}</span>
                 <div>
-                  {/* 【重要】onClickで onEditRecord を呼び出せるようになります */}
                   <button onClick={() => onEditRecord(record)} style={{ marginLeft: '8px', padding: '2px 8px', fontSize: '12px', color: 'white', backgroundColor: '#3498db', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>編集</button>
                   <button onClick={() => handleDeleteClick(record.id)} style={{ marginLeft: '8px', padding: '2px 8px', fontSize: '12px', color: 'white', backgroundColor: '#e74c3c', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>削除</button>
                 </div>
