@@ -4,6 +4,7 @@ import { User } from '../core/models/User';
 import { cardStyle, inputStyle, buttonStyle } from './styles';
 import { HealthRecord } from '../core/models/HealthRecord';
 import { getClientIdFromStorage, saveClientIdToStorage } from '../utils/auth';
+import { GoogleDriveSync } from '../core/services/GoogleDriveSync';
 
 interface ServerStatus {
   isGoogleAuthReady: boolean;
@@ -16,9 +17,10 @@ interface SettingsScreenProps {
   onSettingsChange: (settings: { height: number; targetWeight?: number; targetCalories?: number }) => void;
   allRecords: HealthRecord[];
   onImportData: (records: HealthRecord[]) => void;
+  accessToken: string | null;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, onSettingsChange, allRecords, onImportData }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, onSettingsChange, allRecords, onImportData, accessToken }) => {
   const [height, setHeight] = useState((user.height * 100).toString());
   const [targetWeight, setTargetWeight] = useState(user.targetWeight?.toString() || '');
   const [targetCalories, setTargetCalories] = useState(user.targetCalories?.toString() || '');
@@ -27,6 +29,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, on
 
   const [googleClientId, setGoogleClientId] = useState(getClientIdFromStorage() || '');
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -123,10 +126,39 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, on
     reader.readAsText(file);
   };
 
-  const StatusIndicator: React.FC<{isReady: boolean}> = ({ isReady }) => (
-    <span style={{ color: isReady ? '#2ecc71' : '#e74c3c', fontWeight: 'bold' }}>
-      {isReady ? '設定済み' : '未設定'}
-    </span>
+  const handleGoogleDriveSync = async () => {
+    if (!accessToken) {
+      alert('Googleにログインしていません。');
+      return;
+    }
+    if (allRecords.length === 0) {
+      alert('バックアップする記録がありません。');
+      return;
+    }
+
+    setIsSyncing(true);
+    setFeedback('Google Driveにバックアップ中...');
+    try {
+      const driveSync = new GoogleDriveSync(accessToken);
+      await driveSync.saveBackup(allRecords);
+      setFeedback('Google Driveへのバックアップが完了しました！');
+    } catch (error: any) {
+      setFeedback(`エラー: ${error.message}`);
+      console.error(error);
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setFeedback(''), 5000);
+    }
+  };
+
+
+  const StatusIndicator: React.FC<{isReady: boolean; label: string}> = ({ isReady, label }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+      <span>{label}</span>
+      <span style={{ color: isReady ? '#27ae60' : '#c0392b', fontWeight: 'bold', fontSize: '14px' }}>
+        {isReady ? '✔ 設定済み' : '✖ 未設定'}
+      </span>
+    </div>
   );
 
   return (
@@ -140,40 +172,47 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, on
 
       <div>
         <h3 style={{ marginTop: 0, color: '#2c3e50' }}>APIキーとIDの設定</h3>
-        <div style={{ marginBottom: '16px' }}>
-          <label htmlFor="google-client-id-input">Google Client ID (ブラウザ側)</label>
-          <input id="google-client-id-input" type="text" value={googleClientId} onChange={(e) => setGoogleClientId(e.target.value)} placeholder="Google Cloudで取得したID" style={inputStyle} />
-          <p style={{fontSize: '12px', color: '#666', margin: '4px 0 0'}}>このIDはブラウザに保存されます。変更後はページのリロードが必要です。</p>
-        </div>
-
         <div style={{ padding: '16px', backgroundColor: '#f8f9f9', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-          <h4 style={{marginTop: 0}}>サーバー側の機密キー設定状況</h4>
-          {serverStatus ? (
+          <h4 style={{marginTop: 0, marginBottom: '12px'}}>設定状況の診断</h4>
+          {!serverStatus ? (
+            <p>サーバーの状態を確認中...</p>
+          ) : (
             <>
-              <p style={{margin: '4px 0'}}>
-                <strong>Google Client Secret: </strong> 
-                <StatusIndicator isReady={serverStatus.isGoogleAuthReady} />
-              </p>
-              <p style={{margin: '4px 0'}}>
-                <strong>Gemini API Key: </strong>
-                <StatusIndicator isReady={serverStatus.isGeminiReady} />
-              </p>
-              {(!serverStatus.isGoogleAuthReady || !serverStatus.isGeminiReady) && (
+              <StatusIndicator isReady={!!googleClientId} label="Google Client ID (ブラウザ側)" />
+              <StatusIndicator isReady={serverStatus.isGoogleAuthReady} label="Google Client Secret (サーバー側)" />
+              <StatusIndicator isReady={serverStatus.isGeminiReady} label="Gemini API Key (サーバー側)" />
+              
+              {(!serverStatus.isGoogleAuthReady || !serverStatus.isGeminiReady || !googleClientId) && (
                 <div style={{fontSize: '13px', color: '#34495e', marginTop: '16px', padding: '12px', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '8px'}}>
                   <strong>アクションが必要です:</strong><br/>
-                  サーバー側のキーが未設定です。Google認証やAI分析を利用するには、プロジェクトのルートに <code>.env</code> ファイルを作成し、以下の内容を記述してサーバーを再起動してください。
-                  <pre style={{backgroundColor: '#e9ecef', padding: '8px', borderRadius: '4px', marginTop: '8px', whiteSpace: 'pre-wrap'}}>
-                    <code>
-                      GOOGLE_CLIENT_SECRET="ここにシークレットを貼り付け"<br/>
-                      GEMINI_API_KEY="ここにAPIキーを貼り付け"
-                    </code>
-                  </pre>
+                  未設定の項目があります。以下の手順に従って設定してください。
                 </div>
               )}
             </>
-          ) : (
-            <p>サーバーの状態を確認中...</p>
           )}
+        </div>
+
+        <div style={{ marginTop: '16px' }}>
+          <label htmlFor="google-client-id-input">1. Google Client ID を入力</label>
+          <input id="google-client-id-input" type="text" value={googleClientId} onChange={(e) => setGoogleClientId(e.target.value)} placeholder="Google Cloudで取得したID" style={inputStyle} />
+          <p style={{fontSize: '12px', color: '#666', margin: '4px 0 0'}}>このIDは安全なため、ブラウザに保存されます。</p>
+        </div>
+
+         <div style={{ marginTop: '16px' }}>
+          <label>2. サーバー側のキーを設定</label>
+           <div style={{fontSize: '13px', color: '#34495e', padding: '12px', backgroundColor: '#f8f9f9', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
+              <p style={{marginTop: 0}}>
+                <code>GOOGLE_CLIENT_SECRET</code>と<code>GEMINI_API_KEY</code>は、セキュリティのためサーバーでのみ設定します。
+              </p>
+              プロジェクトのルートに <code>.env</code> ファイルを作成し、以下の内容を記述してサーバーを再起動してください。
+              <pre style={{backgroundColor: '#e9ecef', padding: '8px', borderRadius: '4px', marginTop: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>
+                <code>
+                  VITE_GOOGLE_CLIENT_ID="{googleClientId || 'ここにクライアントID'}"<br/>
+                  GOOGLE_CLIENT_SECRET="ここにシークレットを貼り付け"<br/>
+                  GEMINI_API_KEY="ここにAPIキーを貼り付け"
+                </code>
+              </pre>
+            </div>
         </div>
       </div>
 
@@ -197,9 +236,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, on
 
       <hr style={{ margin: '24px 0', border: 0, borderTop: '1px solid #eee' }} />
       <h3 style={{ marginTop: 0, color: '#2c3e50' }}>データ管理</h3>
-      <div style={{display: 'flex', gap: '16px'}}>
-          <button onClick={handleImportClick} style={{...buttonStyle, backgroundColor: '#3498db'}}>インポート</button>
-          <button onClick={handleExport} style={{...buttonStyle, backgroundColor: '#2ecc71'}}>エクスポート</button>
+      <div style={{display: 'flex', gap: '16px', flexWrap: 'wrap'}}>
+          <button onClick={handleImportClick} style={{...buttonStyle, flex: 1, minWidth: '120px'}}>インポート</button>
+          <button onClick={handleExport} style={{...buttonStyle, flex: 1, minWidth: '120px', backgroundColor: '#2ecc71'}}>エクスポート</button>
+          <button 
+            onClick={handleGoogleDriveSync} 
+            style={{...buttonStyle, flex: '1 1 100%', backgroundColor: '#4285F4'}}
+            disabled={!accessToken || isSyncing}
+          >
+            {isSyncing ? 'バックアップ中...' : 'Google Driveにバックアップ'}
+          </button>
       </div>
       <input
         type="file"
@@ -210,7 +256,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ user, onBack, on
       />
 
       <button onClick={handleSaveSettings} style={{...buttonStyle, marginTop: '24px'}}>すべての設定を保存</button>
-      {feedback && <p style={{ marginTop: '12px', color: feedback.startsWith('エラー') ? '#e74c3c' : '#27ae60' }}>{feedback}</p>}
+      {feedback && <p style={{ marginTop: '12px', color: feedback.startsWith('エラー') ? '#c0392b' : '#27ae60' }}>{feedback}</p>}
     </div>
   );
 };

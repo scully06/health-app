@@ -23,6 +23,7 @@ export const SleepInputForm: React.FC<SleepInputFormProps> = ({ user, recordMana
   const [unit, setUnit] = useState<'minutes' | 'hours'>('minutes');
   const [isEditing, setIsEditing] = useState(false);
 
+  // 【バグ修正】編集状態の管理ロジックを修正
   useEffect(() => {
     if (editingRecord && editingRecord instanceof SleepRecord) {
       const { stageDurations } = editingRecord;
@@ -34,20 +35,17 @@ export const SleepInputForm: React.FC<SleepInputFormProps> = ({ user, recordMana
       setUnit('minutes');
       setFeedback('記録を編集中...');
     } else {
+      setDeep('');
+      setLight('');
+      setRem('');
+      setAwake('');
       setIsEditing(false);
-      if (!editingRecord) {
-          setDeep('');
-          setLight('');
-          setRem('');
-          setAwake('');
-          setFeedback('');
-      }
+      setFeedback('');
     }
   }, [editingRecord]);
 
 
   const handleSave = async () => {
-    // 【追加】未来日でないか検証
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     const selectedDate = new Date(currentDate.replace(/-/g, '/'));
@@ -83,7 +81,6 @@ export const SleepInputForm: React.FC<SleepInputFormProps> = ({ user, recordMana
     try {
       await recordManager.saveRecord(newRecord);
       setFeedback('睡眠記録を保存しました！');
-      setDeep(''); setLight(''); setRem(''); setAwake('');
       onRecordSaved();
       setTimeout(() => setFeedback(''), 3000);
     } catch (error) {

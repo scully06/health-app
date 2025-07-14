@@ -21,22 +21,20 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
   const [feedbackMessage, setFeedbackMessage] = useState<string>('');
   const [isEditing, setIsEditing] = useState(false);
 
+  // 【バグ修正】編集状態の管理ロジックを修正
   useEffect(() => {
     if (editingRecord && editingRecord instanceof WeightRecord) {
       setWeight(editingRecord.weight.toString());
       setIsEditing(true);
       setFeedbackMessage('記録を編集中...');
     } else {
+      setWeight('');
       setIsEditing(false);
-      if (!editingRecord) {
-          setWeight('');
-          setFeedbackMessage('');
-      }
+      setFeedbackMessage('');
     }
   }, [editingRecord]);
 
   const handleSaveClick = async () => {
-    // 【追加】未来日でないか検証
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     const selectedDate = new Date(currentDate.replace(/-/g, '/'));
@@ -60,7 +58,6 @@ export const WeightInputForm: React.FC<WeightInputFormProps> = ({ user, recordMa
       const bmi = analysisEngine.calculateBMI(newRecord.weight, user.height);
       const bmiFeedback = bmi !== null ? `あなたのBMIは ${bmi} です。` : '';
       setFeedbackMessage(`保存しました！ ${bmiFeedback}`);
-      setWeight('');
       onRecordSaved();
     } catch (error) {
       setFeedbackMessage('エラー: 保存に失敗しました。');

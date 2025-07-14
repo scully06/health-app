@@ -8,9 +8,43 @@ import { FoodRecord } from '../models/FoodRecord';
 
 export interface IExtendedRecordManager extends IRecordManager {
   deleteRecord(recordId: string): Promise<void>;
-  // 【追加】
   overwriteAllRecords(records: HealthRecord[]): Promise<void>;
 }
+
+/**
+ * JSONオブジェクトを検証し、HealthRecordインスタンスに変換するヘルパー関数
+ * @param obj - JSONからパースされたプレーンなオブジェクト
+ * @returns HealthRecordのインスタンス、または無効なデータの場合はnull
+ */
+const recordReviver = (obj: any): HealthRecord | null => {
+  if (!obj || typeof obj.id !== 'string' || typeof obj.userId !== 'string' || !obj.date) {
+    console.warn('Skipping invalid record object:', obj);
+    return null;
+  }
+
+  // 【修正】Safariやテスト環境でも安全な日付解析を行う
+  const dateString = typeof obj.date === 'string' ? obj.date.replace(/-/g, '/') : obj.date;
+  const recordDate = new Date(dateString);
+  
+  if (isNaN(recordDate.getTime())) {
+    console.warn('Skipping record with invalid date:', obj);
+    return null;
+  }
+
+  if ('weight' in obj && typeof obj.weight === 'number') {
+    return new WeightRecord(obj.id, obj.userId, recordDate, obj.weight);
+  }
+  if ('stageDurations' in obj && typeof obj.stageDurations === 'object') {
+    return new SleepRecord(obj.id, obj.userId, recordDate, obj.stageDurations);
+  }
+  if ('mealType' in obj && typeof obj.mealType === 'string' && typeof obj.description === 'string' && typeof obj.calories === 'number') {
+    return new FoodRecord(obj.id, obj.userId, recordDate, obj.mealType, obj.description, obj.calories);
+  }
+
+  console.warn('Skipping unknown record type:', obj);
+  return null;
+};
+
 
 export class RecordManager implements IExtendedRecordManager {
   private readonly STORAGE_KEY = 'health-app-records';
@@ -21,41 +55,23 @@ export class RecordManager implements IExtendedRecordManager {
     this.loadRecordsFromStorage();
   }
   
-  // 【追加】インポート機能のために、全データを一括で上書きするメソッド
-  public async overwriteAllRecords(newRecords: HealthRecord[]): Promise<void> {
+  public async overwriteAllRecords(newRecords: any[]): Promise<void> {
     try {
-      // オブジェクトの配列をインスタンスに再変換
-      this.records = newRecords.map((obj: any) => {
-        const recordDate = new Date(obj.date);
-        if ('weight' in obj) return new WeightRecord(obj.id, obj.userId, recordDate, obj.weight);
-        if ('stageDurations' in obj) return new SleepRecord(obj.id, obj.userId, recordDate, obj.stageDurations);
-        if ('mealType' in obj) return new FoodRecord(obj.id, obj.userId, recordDate, obj.mealType, obj.description, obj.calories);
-        return null;
-      }).filter(Boolean) as HealthRecord[];
-
+      this.records = newRecords.map(recordReviver).filter((r): r is HealthRecord => r !== null);
       this.saveRecordsToStorage();
       console.log(`[RecordManager] 全記録をインポートデータで上書きしました。件数: ${this.records.length}`);
     } catch(error) {
       console.error('[RecordManager] データのインポートに失敗しました。', error);
-      // エラーを呼び出し元に伝える
       throw new Error('インポートに失敗しました。ファイルの形式が正しくない可能性があります。');
     }
   }
-
 
   private loadRecordsFromStorage(): void {
     try {
       const storedData = localStorage.getItem(this.STORAGE_KEY);
       if (storedData) {
         const plainObjects: any[] = JSON.parse(storedData);
-        this.records = plainObjects.map(obj => {
-          const recordDate = new Date(obj.date);
-          if ('weight' in obj) return new WeightRecord(obj.id, obj.userId, recordDate, obj.weight);
-          if ('stageDurations' in obj) return new SleepRecord(obj.id, obj.userId, recordDate, obj.stageDurations);
-          if ('mealType' in obj) return new FoodRecord(obj.id, obj.userId, recordDate, obj.mealType, obj.description, obj.calories);
-          return null;
-        }).filter(Boolean) as HealthRecord[];
-        
+        this.records = plainObjects.map(recordReviver).filter((r): r is HealthRecord => r !== null);
         console.log('[RecordManager] localStorageからデータを読み込みました。');
       }
     } catch (error) {
@@ -100,7 +116,7 @@ export class RecordManager implements IExtendedRecordManager {
     this.saveRecordsToStorage();
   }
 
-  public async getRecords(): Promise<HealthRecord[]> { // 変更後
+  public async getRecords(): Promise<HealthRecord[]> {
     return [...this.records];
   }
 

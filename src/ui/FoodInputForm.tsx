@@ -30,12 +30,13 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
   useEffect(() => {
     foodDatabaseService.initialize().then(() => {
       setIsDbLoading(false);
-      console.log('[FoodInputForm] データベースの準備が完了しました。');
     });
   }, []);
   
+  // 【バグ修正】編集状態の管理ロジックを修正
   useEffect(() => {
     if (editingRecord && editingRecord instanceof FoodRecord) {
+      // このフォームが編集対象になった場合
       setMealType(editingRecord.mealType);
       setDescription(editingRecord.description);
       setCalories(editingRecord.calories.toString());
@@ -45,11 +46,12 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
       setSearchResults([]);
       setIsEditing(true);
     } else {
+      // 編集がキャンセルされたか、他のフォームが編集中になった場合、フォームをリセット
       setIsEditing(false);
-      if (!editingRecord) {
-          setDescription('');
-          setCalories('');
-      }
+      setDescription('');
+      setCalories('');
+      setGrams('100');
+      setCaloriesPer100g(null);
     }
   }, [editingRecord]);
 
@@ -85,9 +87,8 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
   };
 
   const handleSave = async () => {
-    // 【追加】未来日でないか検証
     const today = new Date();
-    today.setHours(23, 59, 59, 999); // 今日の終わりまでの記録を許可
+    today.setHours(23, 59, 59, 999);
     const selectedDate = new Date(currentDate.replace(/-/g, '/'));
 
     if (selectedDate > today) {
@@ -122,12 +123,7 @@ export const FoodInputForm: React.FC<FoodInputFormProps> = ({ user, recordManage
     );
     
     await recordManager.saveRecord(newRecord);
-    
-    setDescription('');
-    setCalories('');
-    setGrams('100');
-    setCaloriesPer100g(null);
-
+    // 保存後はApp.tsxからのprops更新でフォームがリセットされるため、ここでのリセットは不要
     onRecordSaved();
   };
 
