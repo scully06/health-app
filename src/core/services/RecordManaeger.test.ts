@@ -1,7 +1,6 @@
 // src/core/services/RecordManager.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RecordManager } from './RecordManager';
-import { HealthRecord } from '../models/HealthRecord';
 import { WeightRecord } from '../models/WeightRecord';
 import { SleepRecord } from '../models/SleepRecord';
 

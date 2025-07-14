@@ -401,6 +401,7 @@ function App() {
         ) : (
           <SettingsScreen 
             user={user} 
+            accessToken={accessToken}
             onBack={() => setCurrentScreen('main')}
             onSettingsChange={handleSettingsChange}
             allRecords={allRecords}
